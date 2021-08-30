@@ -15,9 +15,10 @@ def connect(db):
     POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
     POSTGRES_PORT = os.getenv("POSTGRES_PORT")
     POSTGRES_SERVER = os.getenv("POSTGRES_SERVER")
-    POSTGRES_DB = db
-    SQLALCHEMY_DATABASE_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}\
-            @{POSTGRES_SERVER}:{POSTGRES_PORT}/{POSTGRES_DB}"
+
+    SQLALCHEMY_DATABASE_URL = \
+        f'postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@' +\
+        f'{POSTGRES_SERVER}:{POSTGRES_PORT}/{db}'
 
     connection = create_engine(SQLALCHEMY_DATABASE_URL)
 
