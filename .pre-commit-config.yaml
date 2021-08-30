@@ -1,9 +1,9 @@
 repos:
 
-  - repo: https://github.com/PyCQA/flake8
-    rev: 3.9.2
+  - repo: https://github.com/pre-commit/mirrors-autopep8
+    rev: 'v1.5.7'
     hooks:
-      - id: flake8
+      - id: autopep8
 
 
 
