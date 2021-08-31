@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.router import test, predict, upload
+from app.router import test, predict, train, upload
 from app.database import SessionLocal
 
 app = FastAPI()
@@ -19,6 +19,7 @@ app.add_middleware(
 app.include_router(test.router)
 app.include_router(predict.router)
 app.include_router(upload.router)
+app.include_router(train.router)
 
 
 def get_db():

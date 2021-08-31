@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import pickle
 from app import crud
 
 from fastapi import Depends, APIRouter
@@ -30,9 +31,9 @@ router = APIRouter(
 
 
 @router.get('/file')
-def read_file(column=0, row=5, db: Session = Depends(get_db)):
+def read_file(column: int = 0, row: int = 5, db: Session = Depends(get_db)):
     """
-    Upload file Temporary
+    Read file Temporary
 
     param
         (validation 진행 필요)
@@ -48,7 +49,36 @@ def read_file(column=0, row=5, db: Session = Depends(get_db)):
     pkl = crud.get_pickle(db, version=1)
     try:
         data = np.load(pkl.path, allow_pickle=True)
-        return {'data': data[:int(row), 0:int(column)+1].tolist()}
+        return {'data': data[:row, 0:column+1].tolist()}
     except Exception as e:
         print(e)
         return 0
+
+
+@router.get('/model')
+def read_model(version=1, name='random_forest', db: Session = Depends(get_db)):
+    """
+    Read Model Temporary
+
+    param
+        version: int
+        name: str
+    return
+        path: str
+        version: int
+        name: str
+        classes: int
+    """
+    clf_model = crud.get_clf_model(db, version=version, name=name)
+    print(clf_model.path)
+    try:
+        loaded_model = pickle.load(open(clf_model.path, 'rb'))
+        test = pickle.load(open('test_mnist.pkl', 'rb')).reshape(1, -1)
+
+        pred = loaded_model.predict(test)
+
+        return pred.tolist()
+
+    except Exception as e:
+        print(e)
+        return 11

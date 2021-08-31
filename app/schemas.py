@@ -26,3 +26,19 @@ class PickleCreate(PickleBase):
 class Pickle(PickleBase):
     class config:
         orm_mode = True
+
+
+class ClfModelBase(BaseModel):
+    path: str
+    version: int
+    name: str
+    classes: int
+
+
+class ClfModelCreate(ClfModelBase):
+    pass
+
+
+class ClfModel(ClfModelBase):
+    class Config:
+        orm_mode = True
