@@ -14,16 +14,16 @@ class Item(ItemBase):
         orm_mode = True
 
 
-class PickleBase(BaseModel):
+class DatasetBase(BaseModel):
     path: str
     version: int
 
 
-class PickleCreate(PickleBase):
+class DatasetCreate(DatasetBase):
     pass
 
 
-class Pickle(PickleBase):
+class Dataset(DatasetBase):
     class config:
         orm_mode = True
 

@@ -44,7 +44,7 @@ def train_mnist_rf(version: int = 1, db: Session = Depends(get_db)):
         classes: int
     """
 
-    pkl = crud.get_pickle(db, version=version)
+    pkl = crud.get_dataset(db, version=version)
     data = np.load(pkl.path, allow_pickle=True)
 
     X_train, X_valid, y_train, y_test = preprocessing(data)

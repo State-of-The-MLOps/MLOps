@@ -11,8 +11,8 @@ class Item(Base):
     title = Column(String, index=True, default='test')
 
 
-class Pickle(Base):
-    __tablename__ = 'pickle'
+class Dataset(Base):
+    __tablename__ = 'dataset'
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     path = Column(String, index=True)

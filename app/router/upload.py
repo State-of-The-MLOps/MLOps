@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from app.schemas import Dataset
 import shutil
 
 from fastapi import APIRouter, Depends, File, UploadFile
@@ -36,14 +37,14 @@ async def upload_file(file: UploadFile = File(...), db: Session = Depends(get_db
         file: File
     return (임시적으로 구성)
         file_name: str (path of filename)
-        pickle:
+        dataset:
             path: str
             version: int
     """
     with open(f'{file.filename}', 'wb') as buffer:
         shutil.copyfileobj(file.file, buffer)
-    pickle = crud.create_pickle(db, pickle={
+    dataset = crud.create_dataset(db, Dataset={
         'path': file.filename,
         'version': 1
     })
-    return {'file_name': file.filename, 'pickle': pickle}
+    return {'file_name': file.filename, 'dataset': dataset}

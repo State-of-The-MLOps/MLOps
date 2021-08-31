@@ -3,18 +3,18 @@ from sqlalchemy.orm import Session
 from . import models, schemas
 
 
-def get_pickle(db: Session, version=1):
-    return db.query(models.Pickle).filter(
-        models.Pickle.version == version
+def get_dataset(db: Session, version=1):
+    return db.query(models.Dataset).filter(
+        models.Dataset.version == version
     ).first()
 
 
-def create_pickle(db: Session, pickle: schemas.PickleCreate):
-    db_pickle = models.Pickle(**pickle)
-    db.add(db_pickle)
+def create_dataset(db: Session, Dataset: schemas.DatasetCreate):
+    db_dataset = models.Dataset(**Dataset)
+    db.add(db_dataset)
     db.commit()
-    db.refresh(db_pickle)
-    return db_pickle
+    db.refresh(db_dataset)
+    return db_dataset
 
 
 def get_clf_model(db: Session, version=1, name='random_forest'):

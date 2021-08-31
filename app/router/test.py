@@ -46,7 +46,7 @@ def read_file(column: int = 0, row: int = 5, db: Session = Depends(get_db)):
             path: str
             version: int
     """
-    pkl = crud.get_pickle(db, version=1)
+    pkl = crud.get_dataset(db, version=1)
     try:
         data = np.load(pkl.path, allow_pickle=True)
         return {'data': data[:row, 0:column+1].tolist()}
@@ -70,7 +70,6 @@ def read_model(version=1, name='random_forest', db: Session = Depends(get_db)):
         classes: int
     """
     clf_model = crud.get_clf_model(db, version=version, name=name)
-    print(clf_model.path)
     try:
         loaded_model = pickle.load(open(clf_model.path, 'rb'))
         test = pickle.load(open('test_mnist.pkl', 'rb')).reshape(1, -1)
