@@ -2,8 +2,8 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 
 
-def preprocessing(data: np.ndarray,
-                  TEST_SIZE: float = 0.2):
+def mnist_preprocessing(data: np.ndarray,
+                        TEST_SIZE: float = 0.2):
     """
         return train_test_split result
     """

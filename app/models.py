@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from sqlalchemy import Column, Integer, String
 
-from .database import Base
+from app.database import Base
 
 
 class Item(Base):

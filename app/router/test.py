@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
-import pickle
-from app import crud
-
-from fastapi import Depends, APIRouter
 import numpy as np
+import pickle
+from fastapi import APIRouter
+from fastapi import Depends
 from sqlalchemy.orm import Session
 
-from .. import models
-from ..database import SessionLocal, engine
+from app import crud
+from app import models
+from app.database import engine
+from app.database import SessionLocal
 
 
 models.Base.metadata.create_all(bind=engine)

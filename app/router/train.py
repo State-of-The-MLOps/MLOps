@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
-from fastapi import Depends, APIRouter
+from fastapi import APIRouter
+from fastapi import Depends
 import numpy as np
 import pickle
 from sklearn.ensemble import RandomForestClassifier
 from sqlalchemy.orm import Session
 
-from app.util import preprocessing
 from app import crud
-
+from app.database import engine
+from app.database import SessionLocal
 import app.models as models
-from app.database import SessionLocal, engine
+from app.util import mnist_preprocessing
 
 
 models.Base.metadata.create_all(bind=engine)
@@ -33,7 +34,11 @@ router = APIRouter(
 
 
 @router.post('/mnist')
-def train_mnist_rf(version: int = 1, db: Session = Depends(get_db)):
+def train_mnist_rf(
+    model_name: str = 'model.pkl',
+    version: int = 1,
+    db: Session = Depends(get_db)
+):
     """
     param
         version: int
@@ -44,10 +49,10 @@ def train_mnist_rf(version: int = 1, db: Session = Depends(get_db)):
         classes: int
     """
 
-    pkl = crud.get_dataset(db, version=version)
-    data = np.load(pkl.path, allow_pickle=True)
+    dataset = crud.get_dataset(db, version=version)
+    data = np.load(dataset.path, allow_pickle=True)
 
-    X_train, X_valid, y_train, y_test = preprocessing(data)
+    X_train, X_valid, y_train, y_test = mnist_preprocessing(data)
 
     clf_model = RandomForestClassifier(n_estimators=500,
                                        max_depth=3,
