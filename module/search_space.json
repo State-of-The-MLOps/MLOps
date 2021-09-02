@@ -1,0 +1,6 @@
+{
+    "max_depth": {"_type":"randint", "_value":[2, 10]},
+    "colsample_bytree": {"_type":"uniform", "_value":[0.3, 1.0]},
+    "learning_rate": {"_type":"uniform", "_value":[0.001, 0.1]},
+    "n_estimators": {"_type":"randint", "_value":[100, 200]}
+}
