@@ -4,7 +4,3 @@ repos:
     rev: 'v1.5.7'
     hooks:
       - id: autopep8
-
-
-
-

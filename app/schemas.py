@@ -33,6 +33,7 @@ class ClfModelBase(BaseModel):
     version: int
     name: str
     classes: int
+    score: float
 
 
 class ClfModelCreate(ClfModelBase):

@@ -1,17 +1,18 @@
-from sklearn.model_selection import train_test_split
-from xgboost import XGBClassifier
-from sklearn.metrics import mean_absolute_error, mean_squared_error
-from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler
-from sklearn.model_selection import KFold
+import os
+import pickle
+
+from dotenv import load_dotenv
 import pandas as pd
 import numpy as np
 import nni
-from os.path import join
-import multiprocessing
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import KFold
 from sqlalchemy.engine import create_engine
 from xgboost.sklearn import XGBRegressor
 
-n_cpus = multiprocessing.cpu_count()
+load_dotenv(verbose=True)
 
 
 def preprocess(x_train, x_valid, col_list):
@@ -21,7 +22,6 @@ def preprocess(x_train, x_valid, col_list):
     tmp_x_train.reset_index(drop=True, inplace=True)
     tmp_x_valid.reset_index(drop=True, inplace=True)
 
-    # 전처리 함수 작성
     encoder = LabelEncoder()
 
     for col in col_list:
@@ -32,10 +32,18 @@ def preprocess(x_train, x_valid, col_list):
     return tmp_x_train.values, tmp_x_valid.values
 
 
-def main(params, df):
-    global best_model, best_mae
+def main(params, df, engine, experiment_info, connection):
+    """
 
-    # df = pd.read_csv(join('.', 'insurance.csv'))
+    """
+
+    path = experiment_info['path']
+    experimenter = experiment_info['experimenter']
+    experiment_name = experiment_info['experiment_name']
+    model_name = experiment_info['model_name']
+    version = experiment_info['version']
+
+    global best_model, best_mae
 
     label_col = ['sex', 'smoker', 'region']
 
@@ -50,9 +58,6 @@ def main(params, df):
     cv_mse = []
     cv_mae = []
 
-    best_model = None
-    best_mae = 99999999
-
     for trn_idx, val_idx in kf.split(x, y):
         x_train, y_train = x.iloc[trn_idx], y.iloc[trn_idx]
         x_valid, y_valid = x.iloc[val_idx], y.iloc[val_idx]
@@ -64,7 +69,8 @@ def main(params, df):
         model = XGBRegressor(**params)
 
         # 모델 학습 및 Early Stopping 적용
-        model.fit(x_tra, y_train)
+        model.fit(x_tra, y_train, eval_set=[
+                  (x_val, y_valid)], early_stopping_rounds=10)
 
         y_train_pred = model.predict(x_tra)
         y_valid_pred = model.predict(x_val)
@@ -77,24 +83,49 @@ def main(params, df):
         cv_mse.append(valid_mse)
         cv_mae.append(valid_mae)
 
-        if best_model:
-            temp = best_mae
-            best_mae = min(best_mae, valid_mae)
-            print('best_mae::', best_mae)
-            if temp != best_mae:
-                best_model = model
-                print('best_model::', best_model)
-        else:
-            best_mae = valid_mae
-            best_model = model
-            print(best_mae)
-
     cv_mse_mean = np.mean(cv_mse)
     cv_mae_mean = np.mean(cv_mae)
 
-    print(cv_mse_mean, cv_mae_mean)
-    # 학습 결과 리포팅
-    print(best_model)
+    best_model = pd.read_sql(f"""
+                    SELECT *
+                    FROM reg_model
+                    WHERE experiment_name = {experiment_name}
+                """, engine)
+
+    if len(best_model) == 0:
+
+        with open(f"{os.path.join(path, model_name)}.pkl".replace("'", ""), "wb") as f:
+            pickle.dump(model, f)
+        connection.execute(f"""
+            INSERT INTO reg_model (
+                path,
+                experimenter,
+                experiment_name,
+                model_name,
+                version,
+                metric,
+                score
+                ) VALUES (
+                    {path},
+                    {experimenter},
+                    {experiment_name},
+                    {model_name},
+                    {version},
+                    'mae',
+                    {cv_mae_mean}
+                )
+        """)
+    else:
+        with open(f"{os.path.join(path, model_name)}.pkl".replace("'", ""), "wb") as f:
+            pickle.dump(model, f)
+        saved_score = best_model['score'].values[0]
+        if saved_score > valid_mae:
+            connection.execute(f"""
+                UPDATE reg_model
+                SET score = {cv_mae_mean}
+                WHERE experiment_name = {experiment_name}
+            """)
+
     nni.report_final_result(cv_mae_mean)
     print('Final result is %g', cv_mae_mean)
     print('Send final result done.')
@@ -102,12 +133,29 @@ def main(params, df):
 
 if __name__ == '__main__':
     params = nni.get_next_parameter()
-    engine = create_engine(
-        "postgresql://postgres:0000@localhost:5432/postgres")
+    POSTGRES_USER = os.getenv("POSTGRES_USER")
+    POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
+    POSTGRES_PORT = os.getenv("POSTGRES_PORT")
+    POSTGRES_SERVER = os.getenv("POSTGRES_SERVER")
+    POSTGRES_DB = os.getenv("POSTGRES_DB")
+    SQLALCHEMY_DATABASE_URL = \
+        f'postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@' +\
+        f'{POSTGRES_SERVER}:{POSTGRES_PORT}/{POSTGRES_DB}'
+    engine = create_engine(SQLALCHEMY_DATABASE_URL)
+
+    experiment_info = {
+        'path': "'C:\\Users\\TFG5076XG\\Documents\\MLOps'",
+        'experimenter': "'DongUk'",
+        'experiment_name': "'insurance0903'",
+        'model_name': "'keep_update_model'",
+        'version': 0.1
+    }
 
     df = pd.read_sql("""
         SELECT *
         FROM insurance
     """, engine)
 
-    main(params, df)
+    with engine.connect() as connection:
+        with connection.begin():
+            main(params, df, engine, experiment_info, connection)
