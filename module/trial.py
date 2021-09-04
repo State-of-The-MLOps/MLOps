@@ -16,6 +16,15 @@ load_dotenv(verbose=True)
 
 
 def preprocess(x_train, x_valid, col_list):
+    """
+    param:
+        x_train : train dataset dataframe
+        x_valid : validation dataset dataframe
+        col_list : columns that required for LabelEncoding
+    return:
+        tmp_x_train.values : numpy.ndarray
+        tmp_x_valid.values : numpy.ndarray
+    """
     tmp_x_train = x_train.copy()
     tmp_x_valid = x_valid.copy()
 
@@ -34,7 +43,12 @@ def preprocess(x_train, x_valid, col_list):
 
 def main(params, df, engine, experiment_info, connection):
     """
-
+    param:
+        params: Parameters determined by NNi
+        df: Dataframe read from DB
+        engine: sqlalchemy engine
+        experiment_info: information of experiment [dict]
+        connection: connection used to communicate with DB
     """
 
     path = experiment_info['path']
@@ -57,6 +71,8 @@ def main(params, df, engine, experiment_info, connection):
 
     cv_mse = []
     cv_mae = []
+    tr_mse = []
+    tr_mae = []
 
     for trn_idx, val_idx in kf.split(x, y):
         x_train, y_train = x.iloc[trn_idx], y.iloc[trn_idx]
@@ -82,9 +98,13 @@ def main(params, df, engine, experiment_info, connection):
 
         cv_mse.append(valid_mse)
         cv_mae.append(valid_mae)
+        tr_mse.append(train_mse)
+        tr_mae.append(train_mae)
 
     cv_mse_mean = np.mean(cv_mse)
     cv_mae_mean = np.mean(cv_mae)
+    tr_mse_mean = np.mean(tr_mse)
+    tr_mae_mean = np.mean(tr_mae)
 
     best_model = pd.read_sql(f"""
                     SELECT *
@@ -103,26 +123,34 @@ def main(params, df, engine, experiment_info, connection):
                 experiment_name,
                 model_name,
                 version,
-                metric,
-                score
+                train_mae,
+                val_mae,
+                train_mse,
+                val_mse
                 ) VALUES (
                     {path},
                     {experimenter},
                     {experiment_name},
                     {model_name},
                     {version},
-                    'mae',
-                    {cv_mae_mean}
+                    {tr_mae_mean},
+                    {tr_mse_mean},
+                    {cv_mae_mean},
+                    {cv_mse_mean}
                 )
         """)
     else:
         with open(f"{os.path.join(path, model_name)}.pkl".replace("'", ""), "wb") as f:
             pickle.dump(model, f)
-        saved_score = best_model['score'].values[0]
+        saved_score = best_model['val_mae'].values[0]
         if saved_score > valid_mae:
             connection.execute(f"""
                 UPDATE reg_model
-                SET score = {cv_mae_mean}
+                SET 
+                    train_mae = {tr_mae_mean},
+                    val_mae = {cv_mae_mean},
+                    train_mse = {tr_mse_mean},
+                    val_mse = {cv_mse_mean}
                 WHERE experiment_name = {experiment_name}
             """)
 
