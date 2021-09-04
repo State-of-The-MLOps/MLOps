@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 
-from app import models, schemas
+from app import models
+from app.api import schemas
 
 
 def get_dataset(db: Session, version=1):

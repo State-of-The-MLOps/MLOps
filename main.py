@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.router import test, predict, train, upload
+from app.api.router import test, predict, train, upload
 from app.database import SessionLocal
 
 app = FastAPI()
