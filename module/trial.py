@@ -108,7 +108,7 @@ def main(params, df, engine, experiment_info, connection):
     tr_mse_mean = np.mean(tr_mse)
     tr_mae_mean = np.mean(tr_mae)
 
-    best_model = pd.read_sql(MODEL % (model_name), engine)
+    best_model = pd.read_sql(SELECT_REG_MODEL % (model_name), engine)
 
     if len(best_model) == 0:
 
@@ -127,7 +127,8 @@ def main(params, df, engine, experiment_info, connection):
         )
 
     else:
-        best_model_metadata = pd.read_sql(VAL_MAE % (model_name), engine)
+        best_model_metadata = pd.read_sql(
+            SELECT_VAL_MAE % (model_name), engine)
         saved_score = best_model_metadata.values[0]
         if saved_score > valid_mae:
             with open(f"{os.path.join(path, model_name)}.pkl".replace("'", ""), "wb") as f:
@@ -165,7 +166,7 @@ if __name__ == '__main__':
         'version': 0.1
     }
 
-    df = pd.read_sql(ALL_INSURANCE, engine)
+    df = pd.read_sql(SELECT_ALL_INSURANCE, engine)
 
     with engine.connect() as connection:
         with connection.begin():

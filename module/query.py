@@ -4,8 +4,8 @@ INSERT_REG_MODEL = """
                 model_name,
                 path
             ) VALUES(
-                {},
-                {}
+                %s,
+                %s
             )
         """
 
@@ -20,14 +20,14 @@ INSERT_REG_MODEL_METADATA = """
                     train_mse,
                     val_mse
                     ) VALUES (
-                        {},
-                        {},
-                        {},
-                        {},
-                        {},
-                        {},
-                        {},
-                        {}
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s
                     )
             """
 
@@ -35,26 +35,26 @@ INSERT_REG_MODEL_METADATA = """
 UPDATE_REG_MODEL_METADATA = """
                     UPDATE reg_model_metadata
                     SET 
-                        train_mae = {},
-                        val_mae = {},
-                        train_mse = {},
-                        val_mse = {}
-                    WHERE experiment_name = {}
+                        train_mae = %s,
+                        val_mae = %s,
+                        train_mse = %s,
+                        val_mse = %s
+                    WHERE experiment_name = %s
                 """
 
 # pd READ_SQL
-ALL_INSURANCE = """
+SELECT_ALL_INSURANCE = """
             SELECT *
             FROM insurance
         """
 
-VAL_MAE = """
+SELECT_VAL_MAE = """
         SELECT val_mae
         FROM reg_model_metadata
         WHERE reg_model_name = %s
     """
 
-MODEL = """
+SELECT_REG_MODEL = """
         SELECT *
         FROM reg_model
         WHERE model_name = %s
