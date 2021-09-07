@@ -31,3 +31,9 @@ def create_clf_model(db: Session, clf_model: schemas.ClfModelCreate):
     db.commit()
     db.refresh(db_cf_model)
     return db_cf_model
+
+
+def get_reg_model(db: Session, model_name: schemas.RegModelBase):
+    return db.query(models.RegModel).filter(
+        models.RegModel.model_name == model_name
+    ).first()
