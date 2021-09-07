@@ -42,7 +42,7 @@ class RegModel(Base):
     path = Column(String, nullable=False)
 
     model_metadata = relationship(
-        "reg_model_metadata", backref="reg_model.model_name")
+        "RegModelMetadata", backref="reg_model.model_name")
 
 
 class RegModelMetadata(Base):
