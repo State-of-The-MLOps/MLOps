@@ -12,6 +12,8 @@ from sklearn.model_selection import KFold
 from sqlalchemy.engine import create_engine
 from xgboost.sklearn import XGBRegressor
 
+from query import *
+
 load_dotenv(verbose=True)
 
 
@@ -106,65 +108,37 @@ def main(params, df, engine, experiment_info, connection):
     tr_mse_mean = np.mean(tr_mse)
     tr_mae_mean = np.mean(tr_mae)
 
-    best_model = pd.read_sql(f"""
-                    SELECT *
-                    FROM reg_model
-                    WHERE model_name = {model_name}
-                """, engine)
+    best_model = pd.read_sql(MODEL % (model_name), engine)
 
     if len(best_model) == 0:
 
         with open(f"{os.path.join(path, model_name)}.pkl".replace("'", ""), "wb") as f:
             pickle.dump(model, f)
-        connection.execute(f"""
-            INSERT INTO reg_model (
-                model_name,
-                path
-            ) VALUES(
-                {model_name},
-                {path}
-            )
-        """)
-        connection.execute(f"""
-            INSERT INTO reg_model_metadata (
-                experiment_name,
-                reg_model_name,
-                experimenter,
-                version,
-                train_mae,
-                val_mae,
-                train_mse,
-                val_mse
-                ) VALUES (
-                    {experiment_name},
-                    {model_name},
-                    {experimenter},
-                    {version},
-                    {tr_mae_mean},
-                    {tr_mse_mean},
-                    {cv_mae_mean},
-                    {cv_mse_mean}
-                )
-        """)
+        connection.execute(INSERT_REG_MODEL % (model_name, path))
+        connection.execute(INSERT_REG_MODEL_METADATA % (
+            experiment_name,
+            model_name,
+            experimenter,
+            version,
+            tr_mae_mean,
+            tr_mse_mean,
+            cv_mae_mean,
+            cv_mse_mean)
+        )
+
     else:
-        best_model_metadata = pd.read_sql(f"""
-                SELECT val_mae
-                FROM reg_model_metadata
-                WHERE reg_model_name = {model_name}
-            """, engine)
+        best_model_metadata = pd.read_sql(VAL_MAE % (model_name), engine)
         saved_score = best_model_metadata.values[0]
         if saved_score > valid_mae:
             with open(f"{os.path.join(path, model_name)}.pkl".replace("'", ""), "wb") as f:
                 pickle.dump(model, f)
-            connection.execute(f"""
-                UPDATE reg_model_metadata
-                SET 
-                    train_mae = {tr_mae_mean},
-                    val_mae = {cv_mae_mean},
-                    train_mse = {tr_mse_mean},
-                    val_mse = {cv_mse_mean}
-                WHERE experiment_name = {experiment_name}
-            """)
+            connection.execute(UPDATE_REG_MODEL_METADATA % (
+                tr_mae_mean,
+                cv_mae_mean,
+                tr_mse_mean,
+                cv_mse_mean,
+                experiment_name)
+            )
 
     nni.report_final_result(cv_mae_mean)
     print('Final result is %g', cv_mae_mean)
@@ -191,10 +165,7 @@ if __name__ == '__main__':
         'version': 0.1
     }
 
-    df = pd.read_sql("""
-        SELECT *
-        FROM insurance
-    """, engine)
+    df = pd.read_sql(ALL_INSURANCE, engine)
 
     with engine.connect() as connection:
         with connection.begin():
