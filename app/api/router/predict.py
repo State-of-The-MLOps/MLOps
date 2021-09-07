@@ -30,11 +30,6 @@ router = APIRouter(
 )
 
 
-@router.get("/")
-def hello_world():
-    return {"message": "Hello predict"}
-
-
 @router.put("/insurance")
 def predict_insurance(info: RegModelPrediction, db: Session = Depends(get_db)):
     """
