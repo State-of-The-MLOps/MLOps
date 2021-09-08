@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 import os
+import codecs
 import pickle
 import numpy as np
 from fastapi.param_functions import Depends
-from app.api.schemas import RegModelPrediction
+from app.api.schemas import ModelCorePrediction
 from fastapi import APIRouter, HTTPException
 from sqlalchemy.orm import Session
 
@@ -31,7 +32,7 @@ router = APIRouter(
 
 
 @router.put("/insurance")
-def predict_insurance(info: RegModelPrediction, db: Session = Depends(get_db)):
+def predict_insurance(info: ModelCorePrediction, model_name: str, db: Session = Depends(get_db)):
     """
     Get information and predict insurance fee
     param:
@@ -47,13 +48,12 @@ def predict_insurance(info: RegModelPrediction, db: Session = Depends(get_db)):
     return:
         insurance_fee: float
     """
-    reg_model = crud.get_reg_model(db, model_name=info.model_name)
+    reg_model = crud.get_reg_model(db, model_name=model_name)
 
     if reg_model:
-        loaded_model = pickle.load(open(
-            os.path.join(reg_model.path, f'{reg_model.model_name}.pkl'),
-            'rb')
-        )
+        loaded_model = pickle.loads(
+            codecs.decode(reg_model.model_file, 'base64'))
+
         test_set = np.array([
             info.age,
             info.sex,

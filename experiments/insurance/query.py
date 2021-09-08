@@ -1,18 +1,18 @@
 # INSERT
-INSERT_REG_MODEL = """
-            INSERT INTO reg_model (
+INSERT_MODEL_CORE = """
+            INSERT INTO model_core (
                 model_name,
-                path
+                model_file
             ) VALUES(
                 %s,
-                %s
+                '%s'
             )
         """
 
-INSERT_REG_MODEL_METADATA = """
-                INSERT INTO reg_model_metadata (
+INSERT_MODEL_METADATA = """
+                INSERT INTO model_metadata (
                     experiment_name,
-                    reg_model_name,
+                    model_core_name,
                     experimenter,
                     version,
                     train_mae,
@@ -32,14 +32,21 @@ INSERT_REG_MODEL_METADATA = """
             """
 
 # UPDATE
-UPDATE_REG_MODEL_METADATA = """
-                    UPDATE reg_model_metadata
+UPDATE_MODEL_METADATA = """
+                    UPDATE model_metadata
                     SET 
                         train_mae = %s,
                         val_mae = %s,
                         train_mse = %s,
                         val_mse = %s
                     WHERE experiment_name = %s
+                """
+UPDATE_MODEL_CORE = """
+                    UPDATE model_core
+                    SET
+                        model_file = '%s'
+                    WHERE
+                        model_name = %s
                 """
 
 # pd READ_SQL
@@ -50,12 +57,12 @@ SELECT_ALL_INSURANCE = """
 
 SELECT_VAL_MAE = """
         SELECT val_mae
-        FROM reg_model_metadata
-        WHERE reg_model_name = %s
+        FROM model_metadata
+        WHERE model_core_name = %s
     """
 
-SELECT_REG_MODEL = """
+SELECT_MODEL_CORE = """
         SELECT *
-        FROM reg_model
+        FROM model_core
         WHERE model_name = %s
     """
