@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import datetime
-from sqlalchemy import Column, String, FLOAT, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, FLOAT, DateTime, ForeignKey, LargeBinary
 from sqlalchemy.sql.functions import now
 from sqlalchemy.orm import relationship
 
@@ -9,22 +9,22 @@ from app.database import Base
 KST = datetime.timezone(datetime.timedelta(hours=9))
 
 
-class RegModel(Base):
-    __tablename__ = 'reg_model'
+class ModelCore(Base):
+    __tablename__ = 'model_core'
 
     model_name = Column(String, primary_key=True)
-    path = Column(String, nullable=False)
+    model_file = Column(LargeBinary, nullable=False)
 
-    model_metadata = relationship(
-        "RegModelMetadata", backref="reg_model.model_name")
+    model_metadata_relation = relationship(
+        "ModelMetadata", backref="model_core.model_name")
 
 
-class RegModelMetadata(Base):
-    __tablename__ = 'reg_model_metadata'
+class ModelMetadata(Base):
+    __tablename__ = 'model_metadata'
 
     experiment_name = Column(String, primary_key=True)
-    reg_model_name = Column(String, ForeignKey(
-        'reg_model.model_name'), nullable=False)
+    model_core_name = Column(String, ForeignKey(
+        'model_core.model_name'), nullable=False)
     experimenter = Column(String, nullable=False)
     version = Column(FLOAT)
     train_mae = Column(FLOAT, nullable=False)

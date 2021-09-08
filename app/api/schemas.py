@@ -1,11 +1,11 @@
 from pydantic import BaseModel
 
 
-class RegModelBase(BaseModel):
+class ModelCoreBase(BaseModel):
     model_name: str
 
 
-class RegModelPrediction(RegModelBase):
+class ModelCorePrediction(BaseModel):
     age: int
     sex: int
     bmi: float
@@ -14,6 +14,6 @@ class RegModelPrediction(RegModelBase):
     region: int
 
 
-class RegModel(RegModelBase):
+class ModelCore(ModelCoreBase):
     class Config:
         orm_mode = True
