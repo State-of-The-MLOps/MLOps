@@ -7,6 +7,8 @@ import tensorflow as tf
 
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+physical_devices = tf.config.list_physical_devices('GPU')
+tf.config.experimental.set_memory_growth(physical_devices[0], enable=True)
 
 class MyModel:
     def __init__(self):
@@ -19,30 +21,25 @@ class MyModel:
         * 모델의 이름을 받아 압축 해제 및 tf_model폴더 아래에 저장한 후 로드하여 
           텐서플로우 모델 객체를 반환합니다.
         """
-        print('load_tftf')
-        # query = f"""SELECT model_file
-        #             FROM model_core
-        #             WHERE model_name='{model_name}';"""
 
-        # bin_data = engine.execute(query).fetchone()[0]
-        # print("query")
+        query = f"""SELECT model_file
+                    FROM model_core
+                    WHERE model_name='{model_name}';"""
 
-        # model_buffer = pickle.loads(codecs.decode(bin_data, "base64"))
-        # print("buffer")
-        # model_path = os.path.join(base_dir, "tf_model", model_name)
-        # print("model path:", model_path)
-        # with zipfile.ZipFile(model_buffer, "r") as bf:
-        #     bf.extractall(model_path)
-        # print("unzip")
-        # tf_model = tf.keras.models.load_model(model_path)
-        # print("tf_model")
+        bin_data = engine.execute(query).fetchone()[0]
 
-        return
+        model_buffer = pickle.loads(codecs.decode(bin_data, "base64"))
+        model_path = os.path.join(base_dir, "tf_model", model_name)
 
-        # return model_path
+        with zipfile.ZipFile(model_buffer, "r") as bf:
+            bf.extractall(model_path)
+        tf_model = tf.keras.models.load_model(model_path)
+
+        return tf_model
+
 
     def load_model(self):
-        self._my_model = self.load_tf_model('keep_update_model')
+        self._my_model = self.load_tf_model('test_model')
 
     @property
     def my_model(self):
