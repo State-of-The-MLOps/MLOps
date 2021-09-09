@@ -1,0 +1,4 @@
+{
+    "layer_n": {"_type":"randint", "_value":[2, 8]},
+    "cell": {"_type":"randint", "_value":[24, 80]}
+}
