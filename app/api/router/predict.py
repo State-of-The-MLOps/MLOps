@@ -9,20 +9,12 @@ from sqlalchemy.orm import Session
 from typing import List
 from app.utils import my_model
 
-from app import crud, models
+from app import models
 from app.database import engine
 from app.database import SessionLocal
 
 
 models.Base.metadata.create_all(bind=engine)
-
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 router = APIRouter(
@@ -33,7 +25,7 @@ router = APIRouter(
 
 
 @router.put("/insurance")
-def predict_insurance(info: ModelCorePrediction, model_name: str, db: Session = Depends(get_db)):
+def predict_insurance(info: ModelCorePrediction, model_name: str):
     """
     Get information and predict insurance fee
     param:
@@ -49,11 +41,17 @@ def predict_insurance(info: ModelCorePrediction, model_name: str, db: Session = 
     return:
         insurance_fee: float
     """
-    reg_model = crud.get_reg_model(db, model_name=model_name)
+    query = """
+        SELECT model_file
+        FROM model_core
+        WHERE model_name='{}';
+    """.format(model_name)
+
+    reg_model = engine.execute(query).fetchone()[0]
 
     if reg_model:
         loaded_model = pickle.loads(
-            codecs.decode(reg_model.model_file, 'base64'))
+            codecs.decode(reg_model, 'base64'))
 
         test_set = np.array([
             info.age,
