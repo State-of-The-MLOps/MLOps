@@ -56,13 +56,10 @@ def main(params, df, engine, experiment_info, connection):
         connection: connection used to communicate with DB
     """
 
-    path = experiment_info['path']
     experimenter = experiment_info['experimenter']
     experiment_name = experiment_info['experiment_name']
     model_name = experiment_info['model_name']
     version = experiment_info['version']
-
-    global best_model, best_mae
 
     label_col = ['sex', 'smoker', 'region']
 
@@ -78,7 +75,8 @@ def main(params, df, engine, experiment_info, connection):
     cv_mae = []
     tr_mse = []
     tr_mae = []
-
+    fold_mae = 1e10
+    fold_model = None
     for trn_idx, val_idx in kf.split(x, y):
         x_train, y_train = x.iloc[trn_idx], y.iloc[trn_idx]
         x_valid, y_valid = x.iloc[val_idx], y.iloc[val_idx]
@@ -105,6 +103,10 @@ def main(params, df, engine, experiment_info, connection):
         cv_mae.append(valid_mae)
         tr_mse.append(train_mse)
         tr_mae.append(train_mae)
+
+        new_mae = min(fold_mae, valid_mae)
+        if new_mae != fold_mae:
+            fold_model = model
 
     cv_mse_mean = np.mean(cv_mse)
     cv_mae_mean = np.mean(cv_mae)
@@ -135,7 +137,7 @@ def main(params, df, engine, experiment_info, connection):
 
         if saved_score > valid_mae:
             pickled_model = codecs.encode(
-                pickle.dumps(model), "base64").decode()
+                pickle.dumps(fold_model), "base64").decode()
 
             connection.execute(UPDATE_MODEL_CORE % (pickled_model, model_name))
             connection.execute(UPDATE_MODEL_METADATA % (
@@ -174,20 +176,22 @@ if __name__ == '__main__':
     try:
         opts, etc_args = getopt.getopt(
             argv[1:],
-            "e:en:mn:v:",
+            "e:n:m:v:",
             [
                 "experimenter=",
                 "experiment_name=",
                 "model_name=",
                 "version"
             ])
+        print(opts)
         for opt, arg in opts:
+            print(opt, arg)
             if opt in ('-e', "--experimenter"):
-                experiment_info['experimenter'] = arg
-            elif opt in ("-en", "--experiment_name"):
-                experiment_info['experiment_name'] = arg
-            elif opt in ("-mn", "--model_name"):
-                experiment_info['model_name'] = arg
+                experiment_info['experimenter'] = f"'{arg}'"
+            elif opt in ("-n", "--experiment_name"):
+                experiment_info['experiment_name'] = f"'{arg}'"
+            elif opt in ("-m", "--model_name"):
+                experiment_info['model_name'] = f"'{arg}'"
             elif opt in ("-v", "--version"):
                 experiment_info['version'] = arg
 
