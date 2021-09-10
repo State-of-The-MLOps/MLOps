@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
-import os
 import codecs
 import pickle
 import numpy as np
-from fastapi.param_functions import Depends
+from fastapi.param_functions import Depends, Query
 from app.api.schemas import ModelCorePrediction
 from fastapi import APIRouter, HTTPException
 from sqlalchemy.orm import Session
+from typing import List
+from app.utils import my_model
 
 from app import crud, models
 from app.database import engine
@@ -72,3 +73,19 @@ def predict_insurance(info: ModelCorePrediction, model_name: str, db: Session = 
             detail="Model Not Found",
             headers={"X-Error": "Model Not Found"},
         )
+
+
+@router.put("/atmos")
+async def predict_temperature(time_series: List[float]):
+    if len(time_series) != 72:
+        return "time series must have 72 values"
+
+    try:
+        tf_model = my_model.my_model
+        time_series = np.array(time_series).reshape(1, -1, 1)
+        result = tf_model.predict(time_series)
+        return result.tolist()
+
+    except Exception as e:
+        print(e)
+        return {"error": str(e)}
