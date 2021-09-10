@@ -1,3 +1,4 @@
 .env
 *.pkl
 __pycache__
+tf_model/**/*
