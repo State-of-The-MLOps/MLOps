@@ -1,14 +1,19 @@
-from app.database import engine
 import codecs
 import pickle
-import zipfile
 import os
+import yaml
+import zipfile
+
 import tensorflow as tf
+
+from app.database import engine
+
 
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 physical_devices = tf.config.list_physical_devices('GPU')
 tf.config.experimental.set_memory_growth(physical_devices[0], enable=True)
+
 
 class MyModel:
     def __init__(self):
@@ -37,7 +42,6 @@ class MyModel:
 
         return tf_model
 
-
     def load_model(self):
         self._my_model = self.load_tf_model('test_model')
 
@@ -48,3 +52,41 @@ class MyModel:
 
 my_model = MyModel()
 my_model.load_model()
+
+
+def write_yml(
+    path,
+    experiment_name,
+    experimenter,
+    model_name,
+    version
+):
+    print(type(version))
+    with open('{}/{}.yml'.format(path, model_name), 'w') as yml_config_file:
+        yaml.dump({
+            'authorName': f'{experimenter}',
+            'experimentName': f'{experiment_name}',
+            'trialConcurrency': 1,
+            'maxExecDuration': '1h',
+            'maxTrialNum': 10,
+            'trainingServicePlatform': 'local',
+            'searchSpacePath': 'search_space.json',
+            'useAnnotation': False,
+            'tuner': {
+                'builtinTunerName': 'Anneal',
+                'classArgs': {
+                    'optimize_mode': 'minimize'
+                }},
+            'trial': {
+                'command': 'python -e %s -en %s -mn %s -v %f trial.py' % (
+                    experimenter,
+                    experiment_name,
+                    model_name,
+                    version
+                ),
+                'codeDir': '.'
+            }}, yml_config_file, default_flow_style=False)
+
+        yml_config_file.close()
+
+    return

@@ -1,6 +1,8 @@
 import os
 import codecs
 import pickle
+import sys
+import getopt
 
 from dotenv import load_dotenv
 import pandas as pd
@@ -161,13 +163,36 @@ if __name__ == '__main__':
         f'{POSTGRES_SERVER}:{POSTGRES_PORT}/{POSTGRES_DB}'
     engine = create_engine(SQLALCHEMY_DATABASE_URL)
 
+    argv = sys.argv
     experiment_info = {
-        'path': "'C:\\Users\\TFG5076XG\\Documents\\MLOps'",
-        'experimenter': "'DongUk'",
-        'experiment_name': "'insurance0903'",
-        'model_name': "'keep_update_model'",
-        'version': 0.1
+        "experimenter": '',
+        "experiment_name": '',
+        "model_name": '',
+        "version": 0.1
     }
+
+    try:
+        opts, etc_args = getopt.getopt(
+            argv[1:],
+            "e:en:mn:v:",
+            [
+                "experimenter=",
+                "experiment_name=",
+                "model_name=",
+                "version"
+            ])
+        for opt, arg in opts:
+            if opt in ('-e', "--experimenter"):
+                experiment_info['experimenter'] = arg
+            elif opt in ("-en", "--experiment_name"):
+                experiment_info['experiment_name'] = arg
+            elif opt in ("-mn", "--model_name"):
+                experiment_info['model_name'] = arg
+            elif opt in ("-v", "--version"):
+                experiment_info['version'] = arg
+
+    except getopt.GetoptError:
+        sys.exit(2)
 
     df = pd.read_sql(SELECT_ALL_INSURANCE, engine)
 
