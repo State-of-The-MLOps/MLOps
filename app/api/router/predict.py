@@ -1,17 +1,15 @@
 # -*- coding: utf-8 -*-
 import codecs
-import pickle
 import numpy as np
-from fastapi.param_functions import Depends, Query
-from app.api.schemas import ModelCorePrediction
-from fastapi import APIRouter, HTTPException
-from sqlalchemy.orm import Session
+import pickle
 from typing import List
-from app.utils import my_model
+
+from fastapi import APIRouter, HTTPException
 
 from app import models
+from app.api.schemas import ModelCorePrediction
 from app.database import engine
-from app.database import SessionLocal
+from app.utils import my_model
 
 
 models.Base.metadata.create_all(bind=engine)
@@ -47,30 +45,24 @@ def predict_insurance(info: ModelCorePrediction, model_name: str):
         WHERE model_name='{}';
     """.format(model_name)
 
-    reg_model = engine.execute(query).fetchone()[0]
+    reg_model = engine.execute(query).fetchone()
 
-    if reg_model:
-        loaded_model = pickle.loads(
-            codecs.decode(reg_model, 'base64'))
-
-        test_set = np.array([
-            info.age,
-            info.sex,
-            info.bmi,
-            info.children,
-            info.smoker,
-            info.region
-        ]).reshape(1, -1)
-
-        pred = loaded_model.predict(test_set)
-
-        return {"result": pred.tolist()[0]}
-    else:
+    if reg_model is None:
         raise HTTPException(
             status_code=404,
             detail="Model Not Found",
             headers={"X-Error": "Model Not Found"},
         )
+
+    loaded_model = pickle.loads(
+        codecs.decode(reg_model[0], 'base64'))
+
+    info = info.dict()
+    test_set = np.array([*info.values()]).reshape(1, -1)
+
+    pred = loaded_model.predict(test_set)
+
+    return {"result": pred.tolist()[0]}
 
 
 @router.put("/atmos")

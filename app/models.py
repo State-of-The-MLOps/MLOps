@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import datetime
+
 from sqlalchemy import Column, Integer, String, FLOAT, DateTime, ForeignKey, LargeBinary
 from sqlalchemy.sql.functions import now
 from sqlalchemy.orm import relationship

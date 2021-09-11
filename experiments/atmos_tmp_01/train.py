@@ -1,8 +1,12 @@
-import pandas as pd
-import numpy as np
-import time
 import os
+import sys
+import time
+from preprocessing import preprocess
+sys.path.append(os.path.dirname( os.path.dirname( os.path.abspath(__file__) ) ))
+
+import numpy as np
 import nni
+import pandas as pd
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras.models import Sequential
@@ -10,7 +14,6 @@ from tensorflow.keras.layers import Dense
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from tensorflow.keras.layers import GRU
 
-from preprocessing import preprocess
 from expr_db import connect
 
 physical_devices = tf.config.list_physical_devices('GPU') 

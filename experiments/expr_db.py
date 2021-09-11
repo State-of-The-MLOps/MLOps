@@ -2,7 +2,8 @@ import os
 from dotenv import load_dotenv
 import sqlalchemy
 
-def connect(db):
+
+def connect(db='postgres'):
     """Returns a connection and a metadata object"""
 
     load_dotenv(verbose=True)

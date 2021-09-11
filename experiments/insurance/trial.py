@@ -3,6 +3,7 @@ import codecs
 import pickle
 import sys
 import getopt
+sys.path.append(os.path.dirname( os.path.dirname( os.path.abspath(__file__) ) ))
 
 from dotenv import load_dotenv
 import pandas as pd
@@ -12,13 +13,12 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import KFold
-from sqlalchemy.engine import create_engine
 from xgboost.sklearn import XGBRegressor
 
+from expr_db import connect
 from query import *
 
 load_dotenv(verbose=True)
-
 
 def preprocess(x_train, x_valid, col_list):
     """
@@ -46,16 +46,16 @@ def preprocess(x_train, x_valid, col_list):
     return tmp_x_train.values, tmp_x_valid.values
 
 
-def main(params, df, engine, experiment_info, connection):
+def main(params, engine, experiment_info, connection):
     """
     param:
         params: Parameters determined by NNi
-        df: Dataframe read from DB
         engine: sqlalchemy engine
         experiment_info: information of experiment [dict]
         connection: connection used to communicate with DB
     """
 
+    df = pd.read_sql(SELECT_ALL_INSURANCE, engine)
     experimenter = experiment_info['experimenter']
     experiment_name = experiment_info['experiment_name']
     model_name = experiment_info['model_name']
@@ -71,12 +71,9 @@ def main(params, df, engine, experiment_info, connection):
 
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
 
-    cv_mse = []
-    cv_mae = []
-    tr_mse = []
-    tr_mae = []
-    fold_mae = 1e10
-    fold_model = None
+    cv_mse, cv_mae, tr_mse, tr_mae = [], [], [], []
+    fold_mae, fold_model = 1e10, None
+
     for trn_idx, val_idx in kf.split(x, y):
         x_train, y_train = x.iloc[trn_idx], y.iloc[trn_idx]
         x_valid, y_valid = x.iloc[val_idx], y.iloc[val_idx]
@@ -155,23 +152,9 @@ def main(params, df, engine, experiment_info, connection):
 
 if __name__ == '__main__':
     params = nni.get_next_parameter()
-    POSTGRES_USER = os.getenv("POSTGRES_USER")
-    POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
-    POSTGRES_PORT = os.getenv("POSTGRES_PORT")
-    POSTGRES_SERVER = os.getenv("POSTGRES_SERVER")
-    POSTGRES_DB = os.getenv("POSTGRES_DB")
-    SQLALCHEMY_DATABASE_URL = \
-        f'postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@' +\
-        f'{POSTGRES_SERVER}:{POSTGRES_PORT}/{POSTGRES_DB}'
-    engine = create_engine(SQLALCHEMY_DATABASE_URL)
-
+    engine = connect()
     argv = sys.argv
-    experiment_info = {
-        "experimenter": '',
-        "experiment_name": '',
-        "model_name": '',
-        "version": 0.1
-    }
+    experiment_info = {}
 
     try:
         opts, etc_args = getopt.getopt(
@@ -181,11 +164,9 @@ if __name__ == '__main__':
                 "experimenter=",
                 "experiment_name=",
                 "model_name=",
-                "version"
+                "version="
             ])
-        print(opts)
         for opt, arg in opts:
-            print(opt, arg)
             if opt in ('-e', "--experimenter"):
                 experiment_info['experimenter'] = f"'{arg}'"
             elif opt in ("-n", "--experiment_name"):
@@ -198,8 +179,6 @@ if __name__ == '__main__':
     except getopt.GetoptError:
         sys.exit(2)
 
-    df = pd.read_sql(SELECT_ALL_INSURANCE, engine)
-
     with engine.connect() as connection:
         with connection.begin():
-            main(params, df, engine, experiment_info, connection)
+            main(params, engine, experiment_info, connection)
