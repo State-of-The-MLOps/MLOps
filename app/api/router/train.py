@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
-from app.utils import write_yml
 import subprocess
 
 from fastapi import APIRouter
+
+from app.utils import write_yml
 
 
 router = APIRouter(
