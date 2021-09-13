@@ -4,6 +4,7 @@ import subprocess
 from fastapi import APIRouter
 
 from app.utils import write_yml
+from logger import L
 
 
 router = APIRouter(
@@ -33,8 +34,11 @@ def train_insurance(
     Returns:
         msg: Regardless of success or not, return address values including PORT.
     """
+    L.info(
+        f"Train Args info\n\texperiment_sec: {experiment_sec}\n\texperiment_name: {experiment_name}\n\texperimenter: {experimenter}\n\tmodel_name: {model_name}\n\tversion: {version}")
     path = 'experiments/insurance/'
     try:
+        L.info("Start NNi")
         write_yml(
             path,
             experiment_name,
@@ -49,7 +53,7 @@ def train_insurance(
         )
 
     except Exception as e:
-        print('error')
-        print(e)
+        L.error(e)
+        return {'error': str(e)}
 
     return {"msg": f'Check out http://127.0.0.1:{PORT}'}
