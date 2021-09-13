@@ -51,7 +51,7 @@ async def predict_insurance(info: ModelCorePrediction, model_name: str):
     try:
         result = await run_in_threadpool(sync_call, info, model_name)
         L.info(
-            f"Predict Args info:{info}\n\tmodel_name is {model_name}\n\tPrediction Result: {result}")
+            f"Predict Args info: {info}\n\tmodel_name: {model_name}\n\tPrediction Result: {result}")
         return result
 
     except Exception as e:
@@ -71,7 +71,7 @@ async def predict_temperature(time_series: List[float]):
         result = tf_model.predict(time_series)
 
         L.info(
-            f"Predict Args info:{time_series}\n\tmodel_name is {tf_model}\n\tPrediction Result: {result.tolist()}")
+            f"Predict Args info: {time_series.flatten().tolist()}\n\tmodel_name: {tf_model}\n\tPrediction Result: {result.tolist()[0]}")
         return result.tolist()
 
     except Exception as e:

@@ -5,8 +5,8 @@ L = logging.getLogger('snowdeer_log')
 L.setLevel(logging.DEBUG)
 
 formatter = logging.Formatter(
-    fmt="[%(levelname)s] [%(filename)s:%(lineno)d -  %(funcName)20s()]\n\t%(message)s",
-    datefmt='%Y-%m-%d %H:%M:%S'
+    fmt="%(asctime)s [%(levelname)s] [%(filename)s:%(lineno)d -  %(funcName)20s()]\n\t%(message)s",
+    datefmt='%y-%m-%d %H:%M:%S'
 )
 
 fileHandler = logging.FileHandler('./log.txt')
