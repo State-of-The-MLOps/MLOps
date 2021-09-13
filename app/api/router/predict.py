@@ -1,15 +1,14 @@
 # -*- coding: utf-8 -*-
-import codecs
 import numpy as np
-import pickle
 from typing import List
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
+from starlette.concurrency import run_in_threadpool
 
 from app import models
 from app.api.schemas import ModelCorePrediction
 from app.database import engine
-from app.utils import my_model
+from app.utils import ScikitLearnModel, my_model
 
 
 models.Base.metadata.create_all(bind=engine)
@@ -23,7 +22,7 @@ router = APIRouter(
 
 
 @router.put("/insurance")
-def predict_insurance(info: ModelCorePrediction, model_name: str):
+async def predict_insurance(info: ModelCorePrediction, model_name: str):
     """
     Get information and predict insurance fee
     param:
@@ -39,30 +38,21 @@ def predict_insurance(info: ModelCorePrediction, model_name: str):
     return:
         insurance_fee: float
     """
-    query = """
-        SELECT model_file
-        FROM model_core
-        WHERE model_name='{}';
-    """.format(model_name)
 
-    reg_model = engine.execute(query).fetchone()
+    def sync_call(info, model_name):
+        model = ScikitLearnModel(model_name)
+        model.load_model()
 
-    if reg_model is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Model Not Found",
-            headers={"X-Error": "Model Not Found"},
-        )
+        info = info.dict()
+        test_set = np.array([*info.values()]).reshape(1, -1)
 
-    loaded_model = pickle.loads(
-        codecs.decode(reg_model[0], 'base64'))
+        pred = model.predict_target(test_set)
 
-    info = info.dict()
-    test_set = np.array([*info.values()]).reshape(1, -1)
+        return {"result": pred.tolist()[0]}
 
-    pred = loaded_model.predict(test_set)
+    result = await run_in_threadpool(sync_call, info, model_name)
 
-    return {"result": pred.tolist()[0]}
+    return result
 
 
 @router.put("/atmos")
@@ -71,7 +61,7 @@ async def predict_temperature(time_series: List[float]):
         return "time series must have 72 values"
 
     try:
-        tf_model = my_model.my_model
+        tf_model = my_model.model
         time_series = np.array(time_series).reshape(1, -1, 1)
         result = tf_model.predict(time_series)
         return result.tolist()
