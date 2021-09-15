@@ -181,7 +181,7 @@ def check_expr_over(experiment_id, experiment_name, experiment_path):
                    ORDER BY mae;"""
     saved_score = engine.execute(score_sql).fetchone()
 
-    if not saved_score or (metrics < saved_score[0]):
+    if not saved_score or (metrics[0] < saved_score[0]):
         winner_model = os.path.join(os.path.join(experiment_path,
                                 "temp",
                                 experiment_name))
