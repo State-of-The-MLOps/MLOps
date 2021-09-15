@@ -17,7 +17,7 @@ router = APIRouter(
 )
 
 
-@router.put("/")
+@router.put("/insurance")
 def train_insurance(
     PORT: int = 8080,
     experiment_sec: int = 20,
@@ -73,15 +73,15 @@ def train_atmos(expr_name: str):
             "nnictl create --port {} --config {}/config.yml".format(
                 nni_port, expr_path))
         sucs_msg = "Successfully started experiment!"
-        
+
         if sucs_msg in nni_create_result:
             p = re.compile(r"The experiment id is ([a-zA-Z0-9]+)\n")
             expr_id = p.findall(nni_create_result)[0]
             m_process = multiprocessing.Process(
-                        target = check_expr_over,
-                        args = (expr_id, expr_name, expr_path)
-                        ) 
-            m_process.start()# 자식 프로세스 분리(nni 실험 진행상황 감시 및 모델 저장)
+                target=check_expr_over,
+                args=(expr_id, expr_name, expr_path)
+            )
+            m_process.start()  # 자식 프로세스 분리(nni 실험 진행상황 감시 및 모델 저장)
 
             L.info(nni_create_result)
             return nni_create_result
