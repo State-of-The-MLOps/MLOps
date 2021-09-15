@@ -24,7 +24,7 @@ PUT {{API_URL}}/train/insurance
 | --------------- | ------------- | ----------- | --------- | ----------------------- |
 | `PORT`      | `body`        | `int`    | `(default) 8080`        | NNi 포트번호      |
 | `experiment_sec`      | `body`        | `int`   | `(default) 20`        | 학습시간(초)            |
-| `experiment_name`      | `body`        | `(default) exp1`    | ✅        | 학습이름    |
+| `experiment_name`      | `body`        | `str`    | `(default) exp1`        | 학습이름    |
 | `experimenter` | `body`        | `str`    | `(default) DongUk`        | 연구자 이름 |
 | `model_name`      | `body`        | `str`    | `(default) insurance_fee_model`        | 학습 모델 이름                    |
 | `version`          | `body`        | `float`    | `(default) 0.1`        | 모델 버전        |
