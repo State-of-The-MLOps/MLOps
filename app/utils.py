@@ -63,6 +63,11 @@ class CoreModel:
 class ScikitLearnModel(CoreModel):
     """
     Scikit learn 라이브러리 기반의 모델을 불러오기 위한 클래스입니다.
+    Examples:
+        >>> sk_model = ScikitLearnModel("my_model")
+        >>> sk_model.load_model()
+        >>> sk_model.predict_target(target)
+        predict result
     """
     def __init__(self, *args):
         super().__init__(*args)
@@ -83,6 +88,11 @@ class ScikitLearnModel(CoreModel):
 class TensorFlowModel(CoreModel):
     """
     Tensorflow 라이브러리 기반의 모델을 불러오기 위한 클래스입니다.
+    Examples:
+        >>> tf_model = TensorflowModel("my_model")
+        >>> tf_model.load_model()
+        >>> tf_model.predict_target(target)
+        predict result
     """
     def __init__(self, *args):
         super().__init__(*args)
@@ -159,7 +169,7 @@ def write_yml(
 def zip_model(model_path):
     """
     입력받은 모델의 경로를 찾아가 모델을 압축하여 메모리 버퍼를 반환합니다.
-    
+
     Args:
         model_path(str): 모델이 있는 경로입니다.
 
@@ -192,6 +202,11 @@ def get_free_port():
 
     Returns:
         현재 사용가능한 포트번호
+
+    Examples:
+        >>> avail_port = get_free_port() # 사용 가능한 포트, 그때그때 다름
+        >>> print(avail_port)
+        45675
     """
     with socketserver.TCPServer(("localhost", 0), None) as s:
         free_port = s.server_address[1]
@@ -237,7 +252,7 @@ def check_expr_over(experiment_id, experiment_name, experiment_path):
             if len(exprs) > 3:
                 exprs.sort()
                 [shutil.rmtree(_) for _ in exprs[3:]]
-    
+
 
     model_path = os.path.join(experiment_path,
                                 "temp",

@@ -16,6 +16,14 @@ def connect(db):
         
     Returns:
         created database engine: 데이터베이스에 연결된 객체를 반환합니다.
+
+    Examples:
+        >>> engine = connect("my_db")
+        >>> query = "SHOW timezone;"
+        >>> engine.execute(query).fetchall()
+        [('Asia/Seoul',)]
+        >>> print(engine)
+        Engine(postgresql://postgres:***@127.0.0.1:5432/my_db)
     """
     print(db)
 

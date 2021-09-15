@@ -29,7 +29,7 @@ async def predict_insurance(info: ModelCorePrediction, model_name: str):
 
     Args:
         info(dict): 다음의 값들을 입력받습니다. age(int), sex(int), bmi(float), children(int), smoker(int), region(int)
-        
+
     Returns:
         insurance_fee(float): 보험료 예측값입니다.
     """
@@ -75,11 +75,10 @@ async def predict_temperature(time_series: List[float]):
         """
         none sync 함수를  sync로 만들어 주기 위한 함수이며 입출력은 부모 함수와 같습니다.
         """
-        tf_model = my_model.model
         time_series = np.array(time_series).reshape(1, -1, 1)
-        result = tf_model.predict(time_series)
+        result = my_model.predict_target(time_series)
         L.info(
-            f"Predict Args info: {time_series.flatten().tolist()}\n\tmodel_name: {tf_model}\n\tPrediction Result: {result.tolist()[0]}")
+            f"Predict Args info: {time_series.flatten().tolist()}\n\tmodel_name: {my_model.model_name}\n\tPrediction Result: {result.tolist()[0]}")
         
         return result
 
