@@ -65,13 +65,17 @@ async def predict_temperature(time_series: List[float]):
         L.error(f'input time_series: {time_series} is not valid')
         return "time series must have 72 values"
 
-    try:
+    def sync_pred_ts(time_series):
         tf_model = my_model.model
         time_series = np.array(time_series).reshape(1, -1, 1)
         result = tf_model.predict(time_series)
-
         L.info(
             f"Predict Args info: {time_series.flatten().tolist()}\n\tmodel_name: {tf_model}\n\tPrediction Result: {result.tolist()[0]}")
+        
+        return result
+
+    try:
+        result = await run_in_threadpool(sync_pred_ts, time_series)
         return result.tolist()
 
     except Exception as e:

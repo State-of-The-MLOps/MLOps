@@ -3,8 +3,8 @@ searchSpaceFile: search_space.json
 trialCommand: python train.py
 trialCodeDirectory: .
 trialConcurrency: 1
-maxExperimentDuration: 48h
-maxTrialNumber: 1000
+maxExperimentDuration: 2h
+maxTrialNumber: 2
 tuner:
   # choice:
   # TPE, Anneal, Evolution, SMAC, BatchTuner, GridSearch, Hyperband

@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
 import subprocess
+import multiprocessing
+import re
+import os
 
 from fastapi import APIRouter
 
-from app.utils import write_yml
+from app.utils import write_yml, get_free_port, base_dir, check_expr_over
 from logger import L
 
 
@@ -57,3 +60,38 @@ def train_insurance(
         return {'error': str(e)}
 
     return {"msg": f'Check out http://127.0.0.1:{PORT}'}
+
+
+@router.put("/atmos")
+def train_atmos(expr_name: str):
+    nni_port = get_free_port()
+    expr_path = os.path.join(base_dir, 'experiments', expr_name)
+
+    # subprocess로 nni실행
+    try:
+        nni_create_result = subprocess.getoutput(
+            "nnictl create --port {} --config {}/config.yml".format(
+                nni_port, expr_path))
+        sucs_msg = "Successfully started experiment!"
+        
+        if sucs_msg in nni_create_result:
+            p = re.compile(r"The experiment id is ([a-zA-Z0-9]+)\n")
+            expr_id = p.findall(nni_create_result)[0]
+            m_process = multiprocessing.Process(
+                        target = check_expr_over,
+                        args = (expr_id, expr_name, expr_path)
+                        ) 
+            m_process.start()# 자식 프로세스 분리(nni 실험 진행상황 감시 및 모델 저장)
+
+            L.info(nni_create_result)
+            return nni_create_result
+
+        else:
+            L.error(nni_create_result)
+            return {"error": nni_create_result}
+
+    except Exception as e:
+        L.error(e)
+        return {'error': str(e)}
+
+    # 코드는 바이너리로 저장하는건 별로인가?(버전관리 차원에서 score랑 같은 행에...)
