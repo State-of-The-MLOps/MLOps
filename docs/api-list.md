@@ -5,6 +5,7 @@ API_URL : 127.0.0.1
 - [API List](#api-list)
     - [Train](#train)
         - [Insurance](#insurance훈련)
+        - [Temperature](#Temperature훈련)
     - [Prediction](#predict)
         - [Insurance](#insurance예측)
         - [Temperature](#Temperature예측)
