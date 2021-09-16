@@ -27,15 +27,21 @@ def train_insurance(
     version: float = 0.1
 ):
     """
+    insurance와 관련된 학습을 실행하기 위한 API입니다.
+
     Args:
-        PORT (int): PORT to run NNi. Defaults to 8080
-        experiment_sec (int): Express the experiment time in seconds Defaults to 20
-        experiment_name (str): experiment name Defaults to exp1
-        experimeter (str): experimenter (author) Defaults to DongUk
-        model_name (str): model name Defaults to insurance_fee_model
-        version (float): version of experiment Defaults to 0.1
+        PORT (int): NNI가 실행될 포트번호. 기본 값: 8080
+        experiment_sec (int): 최대 실험시간(초단위). 기본 값: 20
+        experiment_name (str): 실험이름. 기본 값: exp1
+        experimeter (str): 실험자의 이름. 기본 값: DongUk
+        model_name (str): 모델의 이름. 기본 값: insurance_fee_model
+        version (float): 실험의 버전. 기본 값: 0.1
+
     Returns:
-        msg: Regardless of success or not, return address values including PORT.
+        msg: 실험 실행의 성공과 상관없이 포트번호를 포함한 NNI Dashboard의 주소를 반환합니다.
+    
+    Note:
+        실험의 최종 결과를 반환하지 않습니다.
     """
     L.info(
         f"Train Args info\n\texperiment_sec: {experiment_sec}\n\texperiment_name: {experiment_name}\n\texperimenter: {experimenter}\n\tmodel_name: {model_name}\n\tversion: {version}")
@@ -64,10 +70,21 @@ def train_insurance(
 
 @router.put("/atmos")
 def train_atmos(expr_name: str):
+    """
+    온도 시계열과 관련된 학습을 실행하기 위한 API입니다.
+
+    Args:
+        expr_name(str): NNI가 실행할 실험의 이름 입니다. 이 파라미터를 기반으로 project_dir/experiments/[expr_name] 경로로 찾아가 config.yml을 이용하여 NNI를 실행합니다.
+        
+    Returns:
+        str: NNI실험이 실행된 결과값을 반환하거나 실행과정에서 발생한 에러 메세지를 반환합니다.
+    
+    Note:
+        실험의 최종 결과를 반환하지 않습니다.
+    """
     nni_port = get_free_port()
     expr_path = os.path.join(base_dir, 'experiments', expr_name)
 
-    # subprocess로 nni실행
     try:
         nni_create_result = subprocess.getoutput(
             "nnictl create --port {} --config {}/config.yml".format(
@@ -81,7 +98,7 @@ def train_atmos(expr_name: str):
                         target = check_expr_over,
                         args = (expr_id, expr_name, expr_path)
                         ) 
-            m_process.start()# 자식 프로세스 분리(nni 실험 진행상황 감시 및 모델 저장)
+            m_process.start()
 
             L.info(nni_create_result)
             return nni_create_result
@@ -93,5 +110,3 @@ def train_atmos(expr_name: str):
     except Exception as e:
         L.error(e)
         return {'error': str(e)}
-
-    # 코드는 바이너리로 저장하는건 별로인가?(버전관리 차원에서 score랑 같은 행에...)
