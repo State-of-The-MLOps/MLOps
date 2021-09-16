@@ -9,6 +9,9 @@ import glob
 import shutil
 import subprocess
 import io
+import re
+import multiprocessing
+
 
 import tensorflow as tf
 
@@ -32,6 +35,7 @@ class CoreModel:
         model(obj): 모델이 저장될 인스턴스 변수
         query(str): 입력받은 모델이름을 기반으로 데이터베이스에서 모델을 불러오는 SQL query입니다.
     """
+
     def __init__(self, model_name):
         self.model_name = model_name
         self.model = None
@@ -69,6 +73,7 @@ class ScikitLearnModel(CoreModel):
         >>> sk_model.predict_target(target)
         predict result
     """
+
     def __init__(self, *args):
         super().__init__(*args)
 
@@ -94,6 +99,7 @@ class TensorFlowModel(CoreModel):
         >>> tf_model.predict_target(target)
         predict result
     """
+
     def __init__(self, *args):
         super().__init__(*args)
 
@@ -166,6 +172,143 @@ def write_yml(
     return
 
 
+class CoreNniExperiments:
+
+    def __init__(self, expr_name, author):
+        self.expr_name = expr_name
+        self.author = author
+        self.expr_path = os.path.join(base_dir, 'experiments', expr_name)
+        self.expr_id = None
+        self.nni_port = None
+        self.nni_create_result = None
+        self.server = 'localhost'
+        self.success_msg = "Successfully started experiment!"
+
+    def get_free_port(self):
+        """
+        호출 즉시 사용가능한 포트번호를 반환합니다.
+
+        Returns:
+            현재 사용가능한 포트번호
+
+        Examples:
+            >>> avail_port = get_free_port() # 사용 가능한 포트, 그때그때 다름
+            >>> print(avail_port)
+            45675
+        """
+        with socketserver.TCPServer((self.server, 0), None) as s:
+            self.nni_port = s.server_address[1]
+
+    def init_nni_process(self):
+        self.nni_create_result = subprocess.getoutput(
+            "nnictl create --port {} --config {}/config.yml".format(
+                self.nni_port, self.expr_path))
+
+    def check_nni_process(self):
+        if self.success_msg in self.nni_create_result:
+            p = re.compile(r"The experiment id is ([a-zA-Z0-9]+)\n")
+            self.expr_id = p.findall(self.nni_create_result)[0]
+            m_process = multiprocessing.Process(
+                target=self.control_nni_function
+            )
+            m_process.start()
+            L.info(self.nni_create_result)
+            return self.nni_create_result
+
+        else:
+            L.error(self.nni_create_result)
+            return self.nni_create_result
+
+    def control_nni_function(self):  # check_nni_process 안에서 실행되는 method
+        raise Exception
+
+    def check_function(self):
+        raise Exception
+
+    def execute(self):
+        self.check_function()
+
+
+class TensorflowNniExperiments(CoreNniExperiments):
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.minute = 60
+
+    def check_function(self):
+        # 논리흐름대로 실행시키기
+        super().get_free_port()
+        super().init_nni_process()  # nni process 실행시키기
+        super().check_nni_process()  # control_nni_function을 쓰는 check_nni_process 실행
+
+    def control_nni_function(self):
+        while True:
+            time.sleep(1 * self.minute)
+            expr_list = subprocess.getoutput('nnictl experiment list')
+            running_expr = [expr for expr in expr_list.split(
+                '\n') if self.expr_id in expr]
+
+            if running_expr and ("DONE" in running_expr[0]):
+                self.nni_stop()
+                break
+
+            elif self.expr_id not in expr_list:
+                L.info(expr_list)
+                break
+
+            else:
+                self.left_3_models()
+
+        model_path = os.path.join(self.expr_path,
+                                  "temp",
+                                  "*_{}*".format(self.expr_name))
+        exprs = glob.glob(model_path)
+        if not exprs:
+            return 0
+
+        exprs.sort()
+        exprs = exprs[0]
+        metrics = os.path.basename(exprs).split("_")[:2]
+        metrics = [float(metric) for metric in metrics]
+
+        score_sql = """SELECT mae 
+                    FROM atmos_model_metadata
+                    ORDER BY mae;"""
+        saved_score = engine.execute(score_sql).fetchone()
+
+        if not saved_score or (metrics[0] < saved_score[0]):
+            winner_model = os.path.join(os.path.join(self.expr_path,
+                                                     "temp",
+                                                     self.expr_name))
+            os.rename(exprs, winner_model)
+            m_buffer = zip_model(winner_model)
+            encode_model = codecs.encode(
+                pickle.dumps(m_buffer), "base64").decode()
+            sql_save_model = "INSERT INTO model_core VALUES ('%s', '%s')"
+            engine.execute(sql_save_model % (self.expr_name,
+                                             encode_model))
+
+            sql_save_score = "INSERT INTO atmos_model_metadata VALUES ('%s', '%s', '%s', '%s')"
+            engine.execute(sql_save_score % (self.expr_name,
+                                             self.expr_id,
+                                             metrics[0],
+                                             metrics[1]))
+            L.info("saved model %s %s" % (self.expr_id, self.expr_name))
+
+    def nni_stop(self):
+        stop_expr = subprocess.getoutput("nnictl stop {}".format(
+            self.expr_id))
+        L.info(stop_expr)
+
+    def left_3_models(self):
+        model_path = os.path.join(self.expr_path,
+                                  "temp",
+                                  "*_{}*".format(self.expr_name))
+        exprs = glob.glob(model_path)
+        if len(exprs) > 3:
+            exprs.sort()
+            [shutil.rmtree(_) for _ in exprs[3:]]
+
+
 def zip_model(model_path):
     """
     입력받은 모델의 경로를 찾아가 모델을 압축하여 메모리 버퍼를 반환합니다.
@@ -180,19 +323,20 @@ def zip_model(model_path):
         모델을 보조기억장치에 파일로 저장하지 않습니다.
     """
     model_buffer = io.BytesIO()
-    
+
     basedir = os.path.basename(model_path)
-    
+
     with zipfile.ZipFile(model_buffer, "w") as zf:
         for root, dirs, files in os.walk(model_path):
-            make_arcname = lambda x: os.path.join(root.split(basedir)[-1], x)
+            def make_arcname(x): return os.path.join(
+                root.split(basedir)[-1], x)
             for dr in dirs:
                 dir_path = os.path.join(root, dr)
-                zf.write(filename = dir_path, arcname = make_arcname(dr))
+                zf.write(filename=dir_path, arcname=make_arcname(dr))
             for file in files:
                 file_path = os.path.join(root, file)
-                zf.write(filename = file_path, arcname = make_arcname(file))
-    
+                zf.write(filename=file_path, arcname=make_arcname(file))
+
     return model_buffer
 
 
@@ -231,8 +375,9 @@ def check_expr_over(experiment_id, experiment_name, experiment_path):
         time.sleep(1*minute)
 
         expr_list = subprocess.getoutput("nnictl experiment list")
-        
-        running_expr = [expr for expr in expr_list.split('\n') if experiment_id in expr]
+
+        running_expr = [expr for expr in expr_list.split(
+            '\n') if experiment_id in expr]
         print(running_expr)
         if running_expr and ("DONE" in running_expr[0]):
             stop_expr = subprocess.getoutput("nnictl stop {}".format(
@@ -253,19 +398,18 @@ def check_expr_over(experiment_id, experiment_name, experiment_path):
                 exprs.sort()
                 [shutil.rmtree(_) for _ in exprs[3:]]
 
-
     model_path = os.path.join(experiment_path,
-                                "temp",
-                                "*_{}*".format(experiment_name))
+                              "temp",
+                              "*_{}*".format(experiment_name))
     exprs = glob.glob(model_path)
     if not exprs:
         return 0
-    
+
     exprs.sort()
     exprs = exprs[0]
     metrics = os.path.basename(exprs).split("_")[:2]
     metrics = [float(metric) for metric in metrics]
-    
+
     score_sql = """SELECT mae 
                    FROM atmos_model_metadata
                    ORDER BY mae;"""
@@ -273,20 +417,18 @@ def check_expr_over(experiment_id, experiment_name, experiment_path):
 
     if not saved_score or (metrics[0] < saved_score[0]):
         winner_model = os.path.join(os.path.join(experiment_path,
-                                "temp",
-                                experiment_name))
+                                                 "temp",
+                                                 experiment_name))
         os.rename(exprs, winner_model)
         m_buffer = zip_model(winner_model)
         encode_model = codecs.encode(pickle.dumps(m_buffer), "base64").decode()
         sql_save_model = "INSERT INTO model_core VALUES ('%s', '%s')"
-        engine.execute(sql_save_model%(experiment_name, 
-                                       encode_model))
+        engine.execute(sql_save_model % (experiment_name,
+                                         encode_model))
 
         sql_save_score = "INSERT INTO atmos_model_metadata VALUES ('%s', '%s', '%s', '%s')"
-        engine.execute(sql_save_score%(experiment_name, 
-                                       experiment_id, 
-                                       metrics[0], 
-                                       metrics[1]))
-        L.info("saved model %s %s"%(experiment_id, experiment_name))
-
-
+        engine.execute(sql_save_score % (experiment_name,
+                                         experiment_id,
+                                         metrics[0],
+                                         metrics[1]))
+        L.info("saved model %s %s" % (experiment_id, experiment_name))

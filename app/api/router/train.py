@@ -6,7 +6,7 @@ import os
 
 from fastapi import APIRouter
 
-from app.utils import write_yml, get_free_port, base_dir, check_expr_over
+from app.utils import TensorflowNniExperiments, write_yml, get_free_port, base_dir, check_expr_over
 from logger import L
 
 
@@ -39,7 +39,7 @@ def train_insurance(
 
     Returns:
         msg: 실험 실행의 성공과 상관없이 포트번호를 포함한 NNI Dashboard의 주소를 반환합니다.
-    
+
     Note:
         실험의 최종 결과를 반환하지 않습니다.
     """
@@ -75,38 +75,40 @@ def train_atmos(expr_name: str):
 
     Args:
         expr_name(str): NNI가 실행할 실험의 이름 입니다. 이 파라미터를 기반으로 project_dir/experiments/[expr_name] 경로로 찾아가 config.yml을 이용하여 NNI를 실행합니다.
-        
+
     Returns:
         str: NNI실험이 실행된 결과값을 반환하거나 실행과정에서 발생한 에러 메세지를 반환합니다.
-    
+
     Note:
         실험의 최종 결과를 반환하지 않습니다.
     """
-    nni_port = get_free_port()
-    expr_path = os.path.join(base_dir, 'experiments', expr_name)
+    a = TensorflowNniExperiments('atmos_tmp_01', 'DongUk')
+    a.execute()
+    # nni_port = get_free_port()
+    # expr_path = os.path.join(base_dir, 'experiments', expr_name)
 
-    try:
-        nni_create_result = subprocess.getoutput(
-            "nnictl create --port {} --config {}/config.yml".format(
-                nni_port, expr_path))
-        sucs_msg = "Successfully started experiment!"
+    # try:
+    #     nni_create_result = subprocess.getoutput(
+    #         "nnictl create --port {} --config {}/config.yml".format(
+    #             nni_port, expr_path))
+    #     sucs_msg = "Successfully started experiment!"
 
-        if sucs_msg in nni_create_result:
-            p = re.compile(r"The experiment id is ([a-zA-Z0-9]+)\n")
-            expr_id = p.findall(nni_create_result)[0]
-            m_process = multiprocessing.Process(
-                        target = check_expr_over,
-                        args = (expr_id, expr_name, expr_path)
-                        ) 
-            m_process.start()
+    #     if sucs_msg in nni_create_result:
+    #         p = re.compile(r"The experiment id is ([a-zA-Z0-9]+)\n")
+    #         expr_id = p.findall(nni_create_result)[0]
+    #         m_process = multiprocessing.Process(
+    #                     target = check_expr_over,
+    #                     args = (expr_id, expr_name, expr_path)
+    #                     )
+    #         m_process.start()
 
-            L.info(nni_create_result)
-            return nni_create_result
+    #         L.info(nni_create_result)
+    #         return nni_create_result
 
-        else:
-            L.error(nni_create_result)
-            return {"error": nni_create_result}
+    #     else:
+    #         L.error(nni_create_result)
+    #         return {"error": nni_create_result}
 
-    except Exception as e:
-        L.error(e)
-        return {'error': str(e)}
+    # except Exception as e:
+    #     L.error(e)
+    #     return {'error': str(e)}
