@@ -148,7 +148,7 @@ def write_yml(
             'experimentName': f'{experiment_name}',
             'trialConcurrency': 1,
             'maxExecDuration': '1h',
-            'maxTrialNum': 10,
+            'maxTrialNum': 1,
             'trainingServicePlatform': 'local',
             'searchSpacePath': 'search_space.json',
             'useAnnotation': False,
@@ -172,141 +172,146 @@ def write_yml(
     return
 
 
-class CoreNniExperiments:
+# class NniExperiments:
+#     def __init__(self, expriment_name, author, model_name, version, waiting=None):
+#         self.experiment_name = expriment_name
+#         self.author = author
+#         self.model_name = model_name
+#         self.version = version
+#         self.waiting = waiting
 
-    def __init__(self, expr_name, author):
-        self.expr_name = expr_name
-        self.author = author
-        self.expr_path = os.path.join(base_dir, 'experiments', expr_name)
-        self.expr_id = None
-        self.nni_port = None
-        self.nni_create_result = None
-        self.server = 'localhost'
-        self.success_msg = "Successfully started experiment!"
 
-    def get_free_port(self):
-        """
-        호출 즉시 사용가능한 포트번호를 반환합니다.
-
-        Returns:
-            현재 사용가능한 포트번호
-
-        Examples:
-            >>> avail_port = get_free_port() # 사용 가능한 포트, 그때그때 다름
-            >>> print(avail_port)
-            45675
-        """
-        with socketserver.TCPServer((self.server, 0), None) as s:
-            self.nni_port = s.server_address[1]
-
-    def init_nni_process(self):
-        self.nni_create_result = subprocess.getoutput(
-            "nnictl create --port {} --config {}/config.yml".format(
-                self.nni_port, self.expr_path))
-
-    def check_nni_process(self):
-        if self.success_msg in self.nni_create_result:
-            p = re.compile(r"The experiment id is ([a-zA-Z0-9]+)\n")
-            self.expr_id = p.findall(self.nni_create_result)[0]
-            m_process = multiprocessing.Process(
-                target=self.control_nni_function
+class NniWatcher:
+    def __init__(
+        self,
+        experiment_id,
+        experiment_name,
+        minute=1,
+        is_kill=True,
+        is_update=True,
+        top_cnt=3,
+        evaluation_criteria='val_mae'
+    ):
+        self.experiment_id = experiment_id
+        self.experiment_name = experiment_name
+        self.is_kill = is_kill
+        self.is_update = is_update
+        self.top_cnt = top_cnt
+        self.evaluation_criteria = evaluation_criteria
+        self._wait_minute = minute * 60
+        self._experiment_list = None
+        self._running_experiment = None
+        self._update_model_query = """
+            DELETE FROM temp_model_data
+            WHERE id NOT IN (
+                SELECT id
+                FROM temp_model_data
+                WHERE experiment_name = '{}'
+                ORDER BY {}
+                LIMIT {}
             )
-            m_process.start()
-            L.info(self.nni_create_result)
-            return self.nni_create_result
+        """
 
-        else:
-            L.error(self.nni_create_result)
-            return self.nni_create_result
+    def excute(self):
+        self.watch_process()
+        self.model_final_update()
 
-    def control_nni_function(self):  # check_nni_process 안에서 실행되는 method
-        raise Exception
+    def get_running_experiment(self):
+        self._experiment_list = subprocess.getoutput('nnictl experiment list')
+        self._running_experiment = [expr for expr in self._experiment_list.split(
+            '\n') if self.experiment_id in expr]
+        L.info(self._running_experiment)
 
-    def check_function(self):
-        raise Exception
+    def watch_process(self):
+        if self.is_kill:
+            while True:
+                self.get_running_experiment()
+                time.sleep(self._wait_minute)
+                if self._running_experiment and ("DONE" in self._running_experiment[0]):
+                    _stop_expr = subprocess.getoutput("nnictl stop {}".format(
+                        self.experiment_id
+                    ))
+                    L.info(_stop_expr)
+                    break
 
-    def execute(self):
-        self.check_function()
+                elif self.experiment_id not in self._experiment_list:
+                    L.error('Experiment ID not in Current Experiment List')
+                    L.info(self._experiment_list)
+                    break
 
+                else:
+                    if self.is_update:
+                        self.model_keep_update()
 
-class TensorflowNniExperiments(CoreNniExperiments):
-    def __init__(self, *args):
-        super().__init__(*args)
-        self.minute = 60
+    def model_keep_update(self):
+        engine.execute(
+            self._update_model_query.format(
+                self.experiment_name,
+                self.evaluation_criteria,
+                self.top_cnt)
+        )
 
-    def check_function(self):
-        # 논리흐름대로 실행시키기
-        super().get_free_port()
-        super().init_nni_process()  # nni process 실행시키기
-        super().check_nni_process()  # control_nni_function을 쓰는 check_nni_process 실행
+    def model_final_update(self):
+        final_model = """
+            SELECT * 
+            FROM temp_model_data
+            WHERE experiment_name = '{}'
+            ORDER BY {};
+        """.format(self.experiment_name, self.evaluation_criteria)
+        final_result = engine.execute(final_model).fetchone()
 
-    def control_nni_function(self):
-        while True:
-            time.sleep(1 * self.minute)
-            expr_list = subprocess.getoutput('nnictl experiment list')
-            running_expr = [expr for expr in expr_list.split(
-                '\n') if self.expr_id in expr]
+        saved_model = """
+            SELECT *
+            FROM model_metadata
+            WHERE experiment_name = '{}'
+        """.format(self.experiment_name)
+        saved_result = engine.execute(saved_model).fetchone()
+        INSERT_MODEL_CORE = """
+                INSERT INTO model_core (
+                    model_name,
+                    model_file
+                ) VALUES(
+                    '{}',
+                    '{}'
+                )
+            """
 
-            if running_expr and ("DONE" in running_expr[0]):
-                self.nni_stop()
-                break
+        UPDATE_MODEL_CORE = """
+            UPDATE model_core
+            SET
+                model_file = '{}'
+            WHERE
+                model_name = '{}'
+        """
+        UPDATE_MODEL_METADATA = """
+            UPDATE model_metadata
+            SET 
+                train_mae = {},
+                val_mae = {},
+                train_mse = {},
+                val_mse = {}
+            WHERE experiment_name = '{}'
+        """
+        print(saved_result)
+        if saved_result is None:
+            engine.execute(INSERT_MODEL_CORE.format(
+                final_result.model_name, final_result.model_file))
+        elif float(saved_result[self.evaluation_criteria]) > float(final_result[self.evaluation_criteria]):
+            engine.execute(UPDATE_MODEL_CORE.format(
+                final_result.model_file, final_result.model_name))
+            engine.execute(UPDATE_MODEL_METADATA.format(
+                final_result.train_mae,
+                final_result.val_mae,
+                final_result.train_mse,
+                final_result.val_mse,
+                self.experiment_name)
+            )
 
-            elif self.expr_id not in expr_list:
-                L.info(expr_list)
-                break
-
-            else:
-                self.left_3_models()
-
-        model_path = os.path.join(self.expr_path,
-                                  "temp",
-                                  "*_{}*".format(self.expr_name))
-        exprs = glob.glob(model_path)
-        if not exprs:
-            return 0
-
-        exprs.sort()
-        exprs = exprs[0]
-        metrics = os.path.basename(exprs).split("_")[:2]
-        metrics = [float(metric) for metric in metrics]
-
-        score_sql = """SELECT mae 
-                    FROM atmos_model_metadata
-                    ORDER BY mae;"""
-        saved_score = engine.execute(score_sql).fetchone()
-
-        if not saved_score or (metrics[0] < saved_score[0]):
-            winner_model = os.path.join(os.path.join(self.expr_path,
-                                                     "temp",
-                                                     self.expr_name))
-            os.rename(exprs, winner_model)
-            m_buffer = zip_model(winner_model)
-            encode_model = codecs.encode(
-                pickle.dumps(m_buffer), "base64").decode()
-            sql_save_model = "INSERT INTO model_core VALUES ('%s', '%s')"
-            engine.execute(sql_save_model % (self.expr_name,
-                                             encode_model))
-
-            sql_save_score = "INSERT INTO atmos_model_metadata VALUES ('%s', '%s', '%s', '%s')"
-            engine.execute(sql_save_score % (self.expr_name,
-                                             self.expr_id,
-                                             metrics[0],
-                                             metrics[1]))
-            L.info("saved model %s %s" % (self.expr_id, self.expr_name))
-
-    def nni_stop(self):
-        stop_expr = subprocess.getoutput("nnictl stop {}".format(
-            self.expr_id))
-        L.info(stop_expr)
-
-    def left_3_models(self):
-        model_path = os.path.join(self.expr_path,
-                                  "temp",
-                                  "*_{}*".format(self.expr_name))
-        exprs = glob.glob(model_path)
-        if len(exprs) > 3:
-            exprs.sort()
-            [shutil.rmtree(_) for _ in exprs[3:]]
+        DELETE_EXPERIMENTS = """
+            DELETE FROM temp_model_data
+            WHERE experiment_name = '{}'
+        """
+        engine.execute(DELETE_EXPERIMENTS.format(self.experiment_name))
 
 
 def zip_model(model_path):

@@ -109,41 +109,20 @@ def main(params, engine, experiment_info, connection):
     cv_mae_mean = np.mean(cv_mae)
     tr_mse_mean = np.mean(tr_mse)
     tr_mae_mean = np.mean(tr_mae)
-
-    best_model = pd.read_sql(SELECT_MODEL_CORE % (model_name), engine)
-
-    if len(best_model) == 0:
-
-        pickled_model = codecs.encode(pickle.dumps(model), "base64").decode()
-        connection.execute(INSERT_MODEL_CORE % (model_name, pickled_model))
-        connection.execute(INSERT_MODEL_METADATA % (
-            experiment_name,
-            model_name,
-            experimenter,
-            version,
-            tr_mae_mean,
-            tr_mse_mean,
-            cv_mae_mean,
-            cv_mse_mean)
-        )
-
-    else:
-        best_model_metadata = pd.read_sql(
-            SELECT_VAL_MAE % (model_name), engine)
-        saved_score = best_model_metadata.values[0]
-
-        if saved_score > valid_mae:
-            pickled_model = codecs.encode(
-                pickle.dumps(fold_model), "base64").decode()
-
-            connection.execute(UPDATE_MODEL_CORE % (pickled_model, model_name))
-            connection.execute(UPDATE_MODEL_METADATA % (
-                tr_mae_mean,
-                cv_mae_mean,
-                tr_mse_mean,
-                cv_mse_mean,
-                experiment_name)
-            )
+    pickled_model = codecs.encode(
+        pickle.dumps(fold_model), "base64").decode()
+    
+    connection.execute(INSERT_TEMP_MODEL.format(
+        model_name,
+        pickled_model,
+        experiment_name,
+        experimenter,
+        version,
+        tr_mae_mean,
+        cv_mae_mean,
+        tr_mse_mean,
+        cv_mse_mean
+    ))
 
     nni.report_final_result(cv_mae_mean)
     print('Final result is %g', cv_mae_mean)

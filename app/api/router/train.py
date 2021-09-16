@@ -6,7 +6,7 @@ import os
 
 from fastapi import APIRouter
 
-from app.utils import TensorflowNniExperiments, write_yml, get_free_port, base_dir, check_expr_over
+from app.utils import NniWatcher, write_yml, get_free_port, base_dir, check_expr_over
 from logger import L
 
 
@@ -19,8 +19,6 @@ router = APIRouter(
 
 @router.put("/insurance")
 def train_insurance(
-    PORT: int = 8080,
-    experiment_sec: int = 20,
     experiment_name: str = 'exp1',
     experimenter: str = 'DongUk',
     model_name: str = 'insurance_fee_model',
@@ -30,8 +28,6 @@ def train_insurance(
     insurance와 관련된 학습을 실행하기 위한 API입니다.
 
     Args:
-        PORT (int): NNI가 실행될 포트번호. 기본 값: 8080
-        experiment_sec (int): 최대 실험시간(초단위). 기본 값: 20
         experiment_name (str): 실험이름. 기본 값: exp1
         experimeter (str): 실험자의 이름. 기본 값: DongUk
         model_name (str): 모델의 이름. 기본 값: insurance_fee_model
@@ -43,11 +39,11 @@ def train_insurance(
     Note:
         실험의 최종 결과를 반환하지 않습니다.
     """
+    PORT = get_free_port()
     L.info(
-        f"Train Args info\n\texperiment_sec: {experiment_sec}\n\texperiment_name: {experiment_name}\n\texperimenter: {experimenter}\n\tmodel_name: {model_name}\n\tversion: {version}")
+        f"Train Args info\n\texperiment_name: {experiment_name}\n\texperimenter: {experimenter}\n\tmodel_name: {model_name}\n\tversion: {version}")
     path = 'experiments/insurance/'
     try:
-        L.info("Start NNi")
         write_yml(
             path,
             experiment_name,
@@ -55,17 +51,29 @@ def train_insurance(
             model_name,
             version
         )
-        subprocess.Popen(
-            "nnictl create --port {} --config {}/{}.yml && timeout {} && nnictl stop --port {}".format(
-                PORT, path, model_name, experiment_sec, PORT),
-            shell=True,
+        nni_create_result = subprocess.getoutput(
+            "nnictl create --port {} --config {}/{}.yml".format(
+                PORT, path, model_name)
         )
+        sucs_msg = "Successfully started experiment!"
+
+        if sucs_msg in nni_create_result:
+            p = re.compile(r"The experiment id is ([a-zA-Z0-9]+)\n")
+            expr_id = p.findall(nni_create_result)[0]
+            # expr id 랑 expr name 주고 instance 만들어서
+            # a.excute를 target으로 넘겨주자.
+            nni_watcher = NniWatcher(expr_id, experiment_name)
+            m_process = multiprocessing.Process(
+                target=nni_watcher.excute
+            )
+            m_process.start()
+
+            L.info(nni_create_result)
+            return nni_create_result
 
     except Exception as e:
         L.error(e)
         return {'error': str(e)}
-
-    return {"msg": f'Check out http://127.0.0.1:{PORT}'}
 
 
 @router.put("/atmos")
@@ -82,33 +90,32 @@ def train_atmos(expr_name: str):
     Note:
         실험의 최종 결과를 반환하지 않습니다.
     """
-    a = TensorflowNniExperiments('atmos_tmp_01', 'DongUk')
-    a.execute()
-    # nni_port = get_free_port()
-    # expr_path = os.path.join(base_dir, 'experiments', expr_name)
 
-    # try:
-    #     nni_create_result = subprocess.getoutput(
-    #         "nnictl create --port {} --config {}/config.yml".format(
-    #             nni_port, expr_path))
-    #     sucs_msg = "Successfully started experiment!"
+    nni_port = get_free_port()
+    expr_path = os.path.join(base_dir, 'experiments', expr_name)
 
-    #     if sucs_msg in nni_create_result:
-    #         p = re.compile(r"The experiment id is ([a-zA-Z0-9]+)\n")
-    #         expr_id = p.findall(nni_create_result)[0]
-    #         m_process = multiprocessing.Process(
-    #                     target = check_expr_over,
-    #                     args = (expr_id, expr_name, expr_path)
-    #                     )
-    #         m_process.start()
+    try:
+        nni_create_result = subprocess.getoutput(
+            "nnictl create --port {} --config {}/config.yml".format(
+                nni_port, expr_path))
+        sucs_msg = "Successfully started experiment!"
 
-    #         L.info(nni_create_result)
-    #         return nni_create_result
+        if sucs_msg in nni_create_result:
+            p = re.compile(r"The experiment id is ([a-zA-Z0-9]+)\n")
+            expr_id = p.findall(nni_create_result)[0]
+            m_process = multiprocessing.Process(
+                target=check_expr_over,
+                args=(expr_id, expr_name, expr_path)
+            )
+            m_process.start()
 
-    #     else:
-    #         L.error(nni_create_result)
-    #         return {"error": nni_create_result}
+            L.info(nni_create_result)
+            return nni_create_result
 
-    # except Exception as e:
-    #     L.error(e)
-    #     return {'error': str(e)}
+        else:
+            L.error(nni_create_result)
+            return {"error": nni_create_result}
+
+    except Exception as e:
+        L.error(e)
+        return {'error': str(e)}

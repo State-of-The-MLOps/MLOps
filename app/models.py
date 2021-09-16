@@ -33,3 +33,18 @@ class ModelMetadata(Base):
     train_mse = Column(FLOAT, nullable=False)
     val_mse = Column(FLOAT, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=now())
+
+
+class TempModelData(Base):
+    __tablename__ = 'temp_model_data'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    model_name = Column(String, nullable=False)
+    model_file = Column(LargeBinary, nullable=False)
+    experiment_name = Column(String, nullable=False)
+    experimenter = Column(String, nullable=False)
+    version = Column(FLOAT, nullable=False)
+    train_mae = Column(FLOAT, nullable=False)
+    val_mae = Column(FLOAT, nullable=False)
+    train_mse = Column(FLOAT, nullable=False)
+    val_mse = Column(FLOAT, nullable=False)
