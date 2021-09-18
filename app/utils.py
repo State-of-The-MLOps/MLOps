@@ -17,6 +17,8 @@ import tensorflow as tf
 
 from app.database import engine
 from logger import L
+from app.query import *
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -148,7 +150,7 @@ def write_yml(
             'experimentName': f'{experiment_name}',
             'trialConcurrency': 1,
             'maxExecDuration': '1h',
-            'maxTrialNum': 1,
+            'maxTrialNum': 10,
             'trainingServicePlatform': 'local',
             'searchSpacePath': 'search_space.json',
             'useAnnotation': False,
@@ -172,15 +174,6 @@ def write_yml(
     return
 
 
-# class NniExperiments:
-#     def __init__(self, expriment_name, author, model_name, version, waiting=None):
-#         self.experiment_name = expriment_name
-#         self.author = author
-#         self.model_name = model_name
-#         self.version = version
-#         self.waiting = waiting
-
-
 class NniWatcher:
     def __init__(
         self,
@@ -201,16 +194,6 @@ class NniWatcher:
         self._wait_minute = minute * 60
         self._experiment_list = None
         self._running_experiment = None
-        self._update_model_query = """
-            DELETE FROM temp_model_data
-            WHERE id NOT IN (
-                SELECT id
-                FROM temp_model_data
-                WHERE experiment_name = '{}'
-                ORDER BY {}
-                LIMIT {}
-            )
-        """
 
     def excute(self):
         self.watch_process()
@@ -245,58 +228,28 @@ class NniWatcher:
 
     def model_keep_update(self):
         engine.execute(
-            self._update_model_query.format(
+            UPDATE_TEMP_MODEL_DATA.format(
                 self.experiment_name,
                 self.evaluation_criteria,
                 self.top_cnt)
         )
 
     def model_final_update(self):
-        final_model = """
-            SELECT * 
-            FROM temp_model_data
-            WHERE experiment_name = '{}'
-            ORDER BY {};
-        """.format(self.experiment_name, self.evaluation_criteria)
-        final_result = engine.execute(final_model).fetchone()
+        final_result = engine.execute(
+            SELECT_TEMP_MODEL_BY_EXPR_NAME.format(
+                self.experiment_name,
+                self.evaluation_criteria)
+        ).fetchone()
 
-        saved_model = """
-            SELECT *
-            FROM model_metadata
-            WHERE experiment_name = '{}'
-        """.format(self.experiment_name)
-        saved_result = engine.execute(saved_model).fetchone()
-        INSERT_MODEL_CORE = """
-                INSERT INTO model_core (
-                    model_name,
-                    model_file
-                ) VALUES(
-                    '{}',
-                    '{}'
-                )
-            """
+        saved_result = engine.execute(
+            SELECT_MODEL_METADATA_BY_EXPR_NAME.format(
+                self.experiment_name)
+        ).fetchone()
 
-        UPDATE_MODEL_CORE = """
-            UPDATE model_core
-            SET
-                model_file = '{}'
-            WHERE
-                model_name = '{}'
-        """
-        UPDATE_MODEL_METADATA = """
-            UPDATE model_metadata
-            SET 
-                train_mae = {},
-                val_mae = {},
-                train_mse = {},
-                val_mse = {}
-            WHERE experiment_name = '{}'
-        """
-        print(saved_result)
         if saved_result is None:
             engine.execute(INSERT_MODEL_CORE.format(
                 final_result.model_name, final_result.model_file))
-        elif float(saved_result[self.evaluation_criteria]) > float(final_result[self.evaluation_criteria]):
+        elif saved_result[self.evaluation_criteria] > final_result[self.evaluation_criteria]:
             engine.execute(UPDATE_MODEL_CORE.format(
                 final_result.model_file, final_result.model_name))
             engine.execute(UPDATE_MODEL_METADATA.format(
@@ -307,11 +260,10 @@ class NniWatcher:
                 self.experiment_name)
             )
 
-        DELETE_EXPERIMENTS = """
-            DELETE FROM temp_model_data
-            WHERE experiment_name = '{}'
-        """
-        engine.execute(DELETE_EXPERIMENTS.format(self.experiment_name))
+        engine.execute(
+            DELETE_ALL_EXPERIMENTS_BY_EXPR_NAME.format(
+                self.experiment_name)
+        )
 
 
 def zip_model(model_path):

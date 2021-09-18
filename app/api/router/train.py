@@ -29,7 +29,7 @@ def train_insurance(
 
     Args:
         experiment_name (str): 실험이름. 기본 값: exp1
-        experimeter (str): 실험자의 이름. 기본 값: DongUk
+        experimenter (str): 실험자의 이름. 기본 값: DongUk
         model_name (str): 모델의 이름. 기본 값: insurance_fee_model
         version (float): 실험의 버전. 기본 값: 0.1
 
@@ -60,8 +60,6 @@ def train_insurance(
         if sucs_msg in nni_create_result:
             p = re.compile(r"The experiment id is ([a-zA-Z0-9]+)\n")
             expr_id = p.findall(nni_create_result)[0]
-            # expr id 랑 expr name 주고 instance 만들어서
-            # a.excute를 target으로 넘겨주자.
             nni_watcher = NniWatcher(expr_id, experiment_name)
             m_process = multiprocessing.Process(
                 target=nni_watcher.excute
