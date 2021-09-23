@@ -1,11 +1,12 @@
 import logging
 import logging.handlers
+from colorlog import ColoredFormatter
 
 L = logging.getLogger('snowdeer_log')
 L.setLevel(logging.DEBUG)
 
-formatter = logging.Formatter(
-    fmt="%(asctime)s [%(levelname)s] [%(filename)s:%(lineno)d -  %(funcName)20s()]\n\t%(message)s",
+formatter = ColoredFormatter(
+    fmt="%(log_color)s [%(levelname)s] %(reset)s %(asctime)s [%(filename)s:%(lineno)d -  %(funcName)20s()]\n\t%(message)s",
     datefmt='%y-%m-%d %H:%M:%S'
 )
 
