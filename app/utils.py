@@ -191,7 +191,7 @@ class NniWatcher:
         self.is_update = is_update
         self.top_cnt = top_cnt
         self.evaluation_criteria = evaluation_criteria
-        self._wait_minute = minute * 60
+        self._wait_minute = minute * 20
         self._experiment_list = None
         self._running_experiment = None
 
@@ -209,7 +209,6 @@ class NniWatcher:
         if self.is_kill:
             while True:
                 self.get_running_experiment()
-                time.sleep(self._wait_minute)
                 if self._running_experiment and ("DONE" in self._running_experiment[0]):
                     _stop_expr = subprocess.getoutput("nnictl stop {}".format(
                         self.experiment_id
@@ -225,6 +224,7 @@ class NniWatcher:
                 else:
                     if self.is_update:
                         self.model_keep_update()
+                time.sleep(self._wait_minute)
 
     def model_keep_update(self):
         engine.execute(
