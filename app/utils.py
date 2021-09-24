@@ -150,7 +150,7 @@ def write_yml(
             'experimentName': f'{experiment_name}',
             'trialConcurrency': 1,
             'maxExecDuration': '1h',
-            'maxTrialNum': 10,
+            'maxTrialNum': 1,
             'trainingServicePlatform': 'local',
             'searchSpacePath': 'search_space.json',
             'useAnnotation': False,
