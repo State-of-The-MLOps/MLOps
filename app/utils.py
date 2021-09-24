@@ -1,29 +1,28 @@
 import codecs
-import pickle
-import os
-import yaml
-import zipfile
-import socketserver
-import time
 import glob
-import shutil
-import subprocess
 import io
-import re
 import multiprocessing
-
+import os
+import pickle
+import re
+import shutil
+import socketserver
+import subprocess
+import time
+import zipfile
 
 import tensorflow as tf
+import yaml
 
 from app.database import engine
-from logger import L
 from app.query import *
+from logger import L
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-physical_devices = tf.config.list_physical_devices('GPU')
+physical_devices = tf.config.list_physical_devices("GPU")
 if physical_devices:
     tf.config.experimental.set_memory_growth(physical_devices[0], enable=True)
 
@@ -45,7 +44,9 @@ class CoreModel:
                 SELECT model_file
                 FROM model_core
                 WHERE model_name='{}';
-            """.format(self.model_name)
+            """.format(
+            self.model_name
+        )
 
     def load_model(self):
         """
@@ -85,11 +86,9 @@ class ScikitLearnModel(CoreModel):
         """
         _model = engine.execute(self.query).fetchone()
         if _model is None:
-            raise ValueError('Model Not Found!')
+            raise ValueError("Model Not Found!")
 
-        self.model = pickle.loads(
-            codecs.decode(_model[0], 'base64')
-        )
+        self.model = pickle.loads(codecs.decode(_model[0], "base64"))
 
 
 class TensorFlowModel(CoreModel):
@@ -111,7 +110,7 @@ class TensorFlowModel(CoreModel):
         """
         _model = engine.execute(self.query).fetchone()
         if _model is None:
-            raise ValueError('Model Not Found!')
+            raise ValueError("Model Not Found!")
         model_buffer = pickle.loads(codecs.decode(_model[0], "base64"))
         model_path = os.path.join(base_dir, "tf_model", self.model_name)
 
@@ -120,17 +119,11 @@ class TensorFlowModel(CoreModel):
         self.model = tf.keras.models.load_model(model_path)
 
 
-my_model = TensorFlowModel('test_model')
+my_model = TensorFlowModel("test_model")
 my_model.load_model()
 
 
-def write_yml(
-    path,
-    experiment_name,
-    experimenter,
-    model_name,
-    version
-):
+def write_yml(path, experiment_name, experimenter, model_name, version):
     """
     NNI 실험을 시작하기 위한 config.yml파일을 작성하는 함수 입니다.
 
@@ -144,30 +137,31 @@ def write_yml(
     Returns:
         반환 값은 없으며 입력받은 경로로 yml파일이 작성됩니다.
     """
-    with open('{}/{}.yml'.format(path, model_name), 'w') as yml_config_file:
-        yaml.dump({
-            'authorName': f'{experimenter}',
-            'experimentName': f'{experiment_name}',
-            'trialConcurrency': 1,
-            'maxExecDuration': '1h',
-            'maxTrialNum': 1,
-            'trainingServicePlatform': 'local',
-            'searchSpacePath': 'search_space.json',
-            'useAnnotation': False,
-            'tuner': {
-                'builtinTunerName': 'Anneal',
-                'classArgs': {
-                    'optimize_mode': 'minimize'
-                }},
-            'trial': {
-                'command': 'python trial.py -e {} -n {} -m {} -v {}'.format(
-                    experimenter,
-                    experiment_name,
-                    model_name,
-                    version
-                ),
-                'codeDir': '.'
-            }}, yml_config_file, default_flow_style=False)
+    with open("{}/{}.yml".format(path, model_name), "w") as yml_config_file:
+        yaml.dump(
+            {
+                "authorName": f"{experimenter}",
+                "experimentName": f"{experiment_name}",
+                "trialConcurrency": 1,
+                "maxExecDuration": "1h",
+                "maxTrialNum": 1,
+                "trainingServicePlatform": "local",
+                "searchSpacePath": "search_space.json",
+                "useAnnotation": False,
+                "tuner": {
+                    "builtinTunerName": "Anneal",
+                    "classArgs": {"optimize_mode": "minimize"},
+                },
+                "trial": {
+                    "command": "python trial.py -e {} -n {} -m {} -v {}".format(
+                        experimenter, experiment_name, model_name, version
+                    ),
+                    "codeDir": ".",
+                },
+            },
+            yml_config_file,
+            default_flow_style=False,
+        )
 
         yml_config_file.close()
 
@@ -183,7 +177,7 @@ class NniWatcher:
         is_kill=True,
         is_update=True,
         top_cnt=3,
-        evaluation_criteria='val_mae'
+        evaluation_criteria="val_mae",
     ):
         self.experiment_id = experiment_id
         self.experiment_name = experiment_name
@@ -200,9 +194,12 @@ class NniWatcher:
         self.model_final_update()
 
     def get_running_experiment(self):
-        self._experiment_list = subprocess.getoutput('nnictl experiment list')
-        self._running_experiment = [expr for expr in self._experiment_list.split(
-            '\n') if self.experiment_id in expr]
+        self._experiment_list = subprocess.getoutput("nnictl experiment list")
+        self._running_experiment = [
+            expr
+            for expr in self._experiment_list.split("\n")
+            if self.experiment_id in expr
+        ]
         L.info(self._running_experiment)
 
     def watch_process(self):
@@ -210,14 +207,14 @@ class NniWatcher:
             while True:
                 self.get_running_experiment()
                 if self._running_experiment and ("DONE" in self._running_experiment[0]):
-                    _stop_expr = subprocess.getoutput("nnictl stop {}".format(
-                        self.experiment_id
-                    ))
+                    _stop_expr = subprocess.getoutput(
+                        "nnictl stop {}".format(self.experiment_id)
+                    )
                     L.info(_stop_expr)
                     break
 
                 elif self.experiment_id not in self._experiment_list:
-                    L.error('Experiment ID not in Current Experiment List')
+                    L.error("Experiment ID not in Current Experiment List")
                     L.info(self._experiment_list)
                     break
 
@@ -229,41 +226,45 @@ class NniWatcher:
     def model_keep_update(self):
         engine.execute(
             UPDATE_TEMP_MODEL_DATA.format(
-                self.experiment_name,
-                self.evaluation_criteria,
-                self.top_cnt)
+                self.experiment_name, self.evaluation_criteria, self.top_cnt
+            )
         )
 
     def model_final_update(self):
         final_result = engine.execute(
             SELECT_TEMP_MODEL_BY_EXPR_NAME.format(
-                self.experiment_name,
-                self.evaluation_criteria)
+                self.experiment_name, self.evaluation_criteria
+            )
         ).fetchone()
 
         saved_result = engine.execute(
-            SELECT_MODEL_METADATA_BY_EXPR_NAME.format(
-                self.experiment_name)
+            SELECT_MODEL_METADATA_BY_EXPR_NAME.format(self.experiment_name)
         ).fetchone()
 
+        a = pickle.loads(codecs.decode(final_result.model_file, "base64"))
+        pickled_model = codecs.encode(pickle.dumps(a), "base64").decode()
         if saved_result is None:
-            engine.execute(INSERT_MODEL_CORE.format(
-                final_result.model_name, final_result.model_file))
-        elif saved_result[self.evaluation_criteria] > final_result[self.evaluation_criteria]:
-            engine.execute(UPDATE_MODEL_CORE.format(
-                final_result.model_file, final_result.model_name))
-            engine.execute(UPDATE_MODEL_METADATA.format(
-                final_result.train_mae,
-                final_result.val_mae,
-                final_result.train_mse,
-                final_result.val_mse,
-                self.experiment_name)
+            engine.execute(
+                INSERT_MODEL_CORE.format(final_result.model_name, pickled_model)
+            )
+        elif (
+            saved_result[self.evaluation_criteria]
+            > final_result[self.evaluation_criteria]
+        ):
+            engine.execute(
+                UPDATE_MODEL_CORE.format(pickled_model, final_result.model_name)
+            )
+            engine.execute(
+                UPDATE_MODEL_METADATA.format(
+                    final_result.train_mae,
+                    final_result.val_mae,
+                    final_result.train_mse,
+                    final_result.val_mse,
+                    self.experiment_name,
+                )
             )
 
-        engine.execute(
-            DELETE_ALL_EXPERIMENTS_BY_EXPR_NAME.format(
-                self.experiment_name)
-        )
+        engine.execute(DELETE_ALL_EXPERIMENTS_BY_EXPR_NAME.format(self.experiment_name))
 
 
 def zip_model(model_path):
@@ -285,8 +286,10 @@ def zip_model(model_path):
 
     with zipfile.ZipFile(model_buffer, "w") as zf:
         for root, dirs, files in os.walk(model_path):
-            def make_arcname(x): return os.path.join(
-                root.split(basedir)[-1], x)
+
+            def make_arcname(x):
+                return os.path.join(root.split(basedir)[-1], x)
+
             for dr in dirs:
                 dir_path = os.path.join(root, dr)
                 zf.write(filename=dir_path, arcname=make_arcname(dr))
@@ -329,16 +332,14 @@ def check_expr_over(experiment_id, experiment_name, experiment_path):
     minute = 60
 
     while True:
-        time.sleep(1*minute)
+        time.sleep(1 * minute)
 
         expr_list = subprocess.getoutput("nnictl experiment list")
 
-        running_expr = [expr for expr in expr_list.split(
-            '\n') if experiment_id in expr]
+        running_expr = [expr for expr in expr_list.split("\n") if experiment_id in expr]
         print(running_expr)
         if running_expr and ("DONE" in running_expr[0]):
-            stop_expr = subprocess.getoutput("nnictl stop {}".format(
-                                             experiment_id))
+            stop_expr = subprocess.getoutput("nnictl stop {}".format(experiment_id))
             L.info(stop_expr)
             break
 
@@ -347,17 +348,15 @@ def check_expr_over(experiment_id, experiment_name, experiment_path):
             break
 
         else:
-            model_path = os.path.join(experiment_path,
-                                      "temp",
-                                      "*_{}*".format(experiment_name))
+            model_path = os.path.join(
+                experiment_path, "temp", "*_{}*".format(experiment_name)
+            )
             exprs = glob.glob(model_path)
             if len(exprs) > 3:
                 exprs.sort()
                 [shutil.rmtree(_) for _ in exprs[3:]]
 
-    model_path = os.path.join(experiment_path,
-                              "temp",
-                              "*_{}*".format(experiment_name))
+    model_path = os.path.join(experiment_path, "temp", "*_{}*".format(experiment_name))
     exprs = glob.glob(model_path)
     if not exprs:
         return 0
@@ -373,19 +372,19 @@ def check_expr_over(experiment_id, experiment_name, experiment_path):
     saved_score = engine.execute(score_sql).fetchone()
 
     if not saved_score or (metrics[0] < saved_score[0]):
-        winner_model = os.path.join(os.path.join(experiment_path,
-                                                 "temp",
-                                                 experiment_name))
+        winner_model = os.path.join(
+            os.path.join(experiment_path, "temp", experiment_name)
+        )
         os.rename(exprs, winner_model)
         m_buffer = zip_model(winner_model)
         encode_model = codecs.encode(pickle.dumps(m_buffer), "base64").decode()
         sql_save_model = "INSERT INTO model_core VALUES ('%s', '%s')"
-        engine.execute(sql_save_model % (experiment_name,
-                                         encode_model))
+        engine.execute(sql_save_model % (experiment_name, encode_model))
 
-        sql_save_score = "INSERT INTO atmos_model_metadata VALUES ('%s', '%s', '%s', '%s')"
-        engine.execute(sql_save_score % (experiment_name,
-                                         experiment_id,
-                                         metrics[0],
-                                         metrics[1]))
+        sql_save_score = (
+            "INSERT INTO atmos_model_metadata VALUES ('%s', '%s', '%s', '%s')"
+        )
+        engine.execute(
+            sql_save_score % (experiment_name, experiment_id, metrics[0], metrics[1])
+        )
         L.info("saved model %s %s" % (experiment_id, experiment_name))
