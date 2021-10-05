@@ -34,6 +34,28 @@ INSERT_MODEL_CORE = """
                 )
             """
 
+INSERT_MODEL_METADATA = """
+                INSERT INTO model_metadata (
+                    experiment_name,
+                    model_core_name,
+                    experimenter,
+                    version,
+                    train_mae,
+                    val_mae,
+                    train_mse,
+                    val_mse
+                ) VALUES (
+                    '{}',
+                    '{}',
+                    '{}',
+                    '{}',
+                    '{}',
+                    '{}',
+                    '{}',
+                    '{}'
+                )
+"""
+
 UPDATE_MODEL_CORE = """
             UPDATE model_core
             SET

@@ -1,28 +1,24 @@
-# -*- coding: utf-8 -*-
-import subprocess
 import multiprocessing
-import re
 import os
+import re
+import subprocess
 
 from fastapi import APIRouter
 
-from app.utils import NniWatcher, write_yml, get_free_port, base_dir, check_expr_over
+from app.utils import NniWatcher, base_dir, check_expr_over, get_free_port, write_yml
 from logger import L
 
-
 router = APIRouter(
-    prefix="/train",
-    tags=["train"],
-    responses={404: {"description": "Not Found"}}
+    prefix="/train", tags=["train"], responses={404: {"description": "Not Found"}}
 )
 
 
 @router.put("/insurance")
 def train_insurance(
-    experiment_name: str = 'exp1',
-    experimenter: str = 'DongUk',
-    model_name: str = 'insurance_fee_model',
-    version: float = 0.1
+    experiment_name: str = "exp1",
+    experimenter: str = "DongUk",
+    model_name: str = "insurance_fee_model",
+    version: float = 0.1,
 ):
     """
     insurance와 관련된 학습을 실행하기 위한 API입니다.
@@ -41,29 +37,21 @@ def train_insurance(
     """
     PORT = get_free_port()
     L.info(
-        f"Train Args info\n\texperiment_name: {experiment_name}\n\texperimenter: {experimenter}\n\tmodel_name: {model_name}\n\tversion: {version}")
-    path = 'experiments/insurance/'
+        f"Train Args info\n\texperiment_name: {experiment_name}\n\texperimenter: {experimenter}\n\tmodel_name: {model_name}\n\tversion: {version}"
+    )
+    path = "experiments/insurance/"
     try:
-        write_yml(
-            path,
-            experiment_name,
-            experimenter,
-            model_name,
-            version
-        )
+        write_yml(path, experiment_name, experimenter, model_name, version)
         nni_create_result = subprocess.getoutput(
-            "nnictl create --port {} --config {}/{}.yml".format(
-                PORT, path, model_name)
+            "nnictl create --port {} --config {}/{}.yml".format(PORT, path, model_name)
         )
         sucs_msg = "Successfully started experiment!"
 
         if sucs_msg in nni_create_result:
             p = re.compile(r"The experiment id is ([a-zA-Z0-9]+)\n")
             expr_id = p.findall(nni_create_result)[0]
-            nni_watcher = NniWatcher(expr_id, experiment_name)
-            m_process = multiprocessing.Process(
-                target=nni_watcher.excute
-            )
+            nni_watcher = NniWatcher(expr_id, experiment_name, experimenter, version)
+            m_process = multiprocessing.Process(target=nni_watcher.excute)
             m_process.start()
 
             L.info(nni_create_result)
@@ -71,7 +59,7 @@ def train_insurance(
 
     except Exception as e:
         L.error(e)
-        return {'error': str(e)}
+        return {"error": str(e)}
 
 
 @router.put("/atmos")
@@ -90,20 +78,19 @@ def train_atmos(expr_name: str):
     """
 
     nni_port = get_free_port()
-    expr_path = os.path.join(base_dir, 'experiments', expr_name)
+    expr_path = os.path.join(base_dir, "experiments", expr_name)
 
     try:
         nni_create_result = subprocess.getoutput(
-            "nnictl create --port {} --config {}/config.yml".format(
-                nni_port, expr_path))
+            "nnictl create --port {} --config {}/config.yml".format(nni_port, expr_path)
+        )
         sucs_msg = "Successfully started experiment!"
 
         if sucs_msg in nni_create_result:
             p = re.compile(r"The experiment id is ([a-zA-Z0-9]+)\n")
             expr_id = p.findall(nni_create_result)[0]
             m_process = multiprocessing.Process(
-                target=check_expr_over,
-                args=(expr_id, expr_name, expr_path)
+                target=check_expr_over, args=(expr_id, expr_name, expr_path)
             )
             m_process.start()
 
@@ -116,4 +103,4 @@ def train_atmos(expr_name: str):
 
     except Exception as e:
         L.error(e)
-        return {'error': str(e)}
+        return {"error": str(e)}

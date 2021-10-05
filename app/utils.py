@@ -11,8 +11,10 @@ import subprocess
 import time
 import zipfile
 
+
 import tensorflow as tf
 import yaml
+
 
 from app.database import engine
 from app.query import *
@@ -144,7 +146,7 @@ def write_yml(path, experiment_name, experimenter, model_name, version):
                 "experimentName": f"{experiment_name}",
                 "trialConcurrency": 1,
                 "maxExecDuration": "1h",
-                "maxTrialNum": 1,
+                "maxTrialNum": 10,
                 "trainingServicePlatform": "local",
                 "searchSpacePath": "search_space.json",
                 "useAnnotation": False,
@@ -173,6 +175,8 @@ class NniWatcher:
         self,
         experiment_id,
         experiment_name,
+        experimenter,
+        version,
         minute=1,
         is_kill=True,
         is_update=True,
@@ -181,6 +185,8 @@ class NniWatcher:
     ):
         self.experiment_id = experiment_id
         self.experiment_name = experiment_name
+        self.experimenter = experimenter
+        self.version = version
         self.is_kill = is_kill
         self.is_update = is_update
         self.top_cnt = top_cnt
@@ -243,16 +249,29 @@ class NniWatcher:
 
         a = pickle.loads(codecs.decode(final_result.model_file, "base64"))
         pickled_model = codecs.encode(pickle.dumps(a), "base64").decode()
+
         if saved_result is None:
             engine.execute(
                 INSERT_MODEL_CORE.format(final_result.model_name, pickled_model)
+            )
+            engine.execute(
+                INSERT_MODEL_METADATA.format(
+                    self.experiment_name,
+                    final_result.model_name,
+                    self.experimenter,
+                    self.version,
+                    final_result.train_mae,
+                    final_result.val_mae,
+                    final_result.train_mse,
+                    final_result.val_mse,
+                )
             )
         elif (
             saved_result[self.evaluation_criteria]
             > final_result[self.evaluation_criteria]
         ):
             engine.execute(
-                UPDATE_MODEL_CORE.format(pickled_model, final_result.model_name)
+                UPDATE_MODEL_CORE.format(pickled_model, saved_result.model_name)
             )
             engine.execute(
                 UPDATE_MODEL_METADATA.format(
