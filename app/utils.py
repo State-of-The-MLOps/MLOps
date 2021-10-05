@@ -1,27 +1,29 @@
 import codecs
-import pickle
-import os
-import yaml
-import zipfile
-import socketserver
-import time
 import glob
-import shutil
-import subprocess
 import io
-import re
 import multiprocessing
+import os
+import pickle
+import re
+import shutil
+import socketserver
+import subprocess
+import time
+import zipfile
 
 
 import tensorflow as tf
+import yaml
 
 from app.database import engine
+from app.query import *
 from logger import L
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-physical_devices = tf.config.list_physical_devices('GPU')
+physical_devices = tf.config.list_physical_devices("GPU")
 if physical_devices:
     tf.config.experimental.set_memory_growth(physical_devices[0], enable=True)
 
@@ -43,7 +45,9 @@ class CoreModel:
                 SELECT model_file
                 FROM model_core
                 WHERE model_name='{}';
-            """.format(self.model_name)
+            """.format(
+            self.model_name
+        )
 
     def load_model(self):
         """
@@ -83,11 +87,9 @@ class ScikitLearnModel(CoreModel):
         """
         _model = engine.execute(self.query).fetchone()
         if _model is None:
-            raise ValueError('Model Not Found!')
+            raise ValueError("Model Not Found!")
 
-        self.model = pickle.loads(
-            codecs.decode(_model[0], 'base64')
-        )
+        self.model = pickle.loads(codecs.decode(_model[0], "base64"))
 
 
 class TensorFlowModel(CoreModel):
@@ -109,7 +111,7 @@ class TensorFlowModel(CoreModel):
         """
         _model = engine.execute(self.query).fetchone()
         if _model is None:
-            raise ValueError('Model Not Found!')
+            raise ValueError("Model Not Found!")
         model_buffer = pickle.loads(codecs.decode(_model[0], "base64"))
         model_path = os.path.join(base_dir, "tf_model", self.model_name)
 
@@ -118,17 +120,11 @@ class TensorFlowModel(CoreModel):
         self.model = tf.keras.models.load_model(model_path)
 
 
-my_model = TensorFlowModel('test_model')
+my_model = TensorFlowModel("test_model")
 my_model.load_model()
 
 
-def write_yml(
-    path,
-    experiment_name,
-    experimenter,
-    model_name,
-    version
-):
+def write_yml(path, experiment_name, experimenter, model_name, version):
     """
     NNI 실험을 시작하기 위한 config.yml파일을 작성하는 함수 입니다.
 
@@ -142,171 +138,151 @@ def write_yml(
     Returns:
         반환 값은 없으며 입력받은 경로로 yml파일이 작성됩니다.
     """
-    with open('{}/{}.yml'.format(path, model_name), 'w') as yml_config_file:
-        yaml.dump({
-            'authorName': f'{experimenter}',
-            'experimentName': f'{experiment_name}',
-            'trialConcurrency': 1,
-            'maxExecDuration': '1h',
-            'maxTrialNum': 10,
-            'trainingServicePlatform': 'local',
-            'searchSpacePath': 'search_space.json',
-            'useAnnotation': False,
-            'tuner': {
-                'builtinTunerName': 'Anneal',
-                'classArgs': {
-                    'optimize_mode': 'minimize'
-                }},
-            'trial': {
-                'command': 'python trial.py -e {} -n {} -m {} -v {}'.format(
-                    experimenter,
-                    experiment_name,
-                    model_name,
-                    version
-                ),
-                'codeDir': '.'
-            }}, yml_config_file, default_flow_style=False)
+    with open("{}/{}.yml".format(path, model_name), "w") as yml_config_file:
+        yaml.dump(
+            {
+                "authorName": f"{experimenter}",
+                "experimentName": f"{experiment_name}",
+                "trialConcurrency": 1,
+                "maxExecDuration": "1h",
+                "maxTrialNum": 10,
+                "trainingServicePlatform": "local",
+                "searchSpacePath": "search_space.json",
+                "useAnnotation": False,
+                "tuner": {
+                    "builtinTunerName": "Anneal",
+                    "classArgs": {"optimize_mode": "minimize"},
+                },
+                "trial": {
+                    "command": "python trial.py -e {} -n {} -m {} -v {}".format(
+                        experimenter, experiment_name, model_name, version
+                    ),
+                    "codeDir": ".",
+                },
+            },
+            yml_config_file,
+            default_flow_style=False,
+        )
 
         yml_config_file.close()
 
     return
 
 
-class CoreNniExperiments:
+class NniWatcher:
+    def __init__(
+        self,
+        experiment_id,
+        experiment_name,
+        experimenter,
+        version,
+        minute=1,
+        is_kill=True,
+        is_update=True,
+        top_cnt=3,
+        evaluation_criteria="val_mae",
+    ):
+        self.experiment_id = experiment_id
+        self.experiment_name = experiment_name
+        self.experimenter = experimenter
+        self.version = version
+        self.is_kill = is_kill
+        self.is_update = is_update
+        self.top_cnt = top_cnt
+        self.evaluation_criteria = evaluation_criteria
+        self._wait_minute = minute * 20
+        self._experiment_list = None
+        self._running_experiment = None
 
-    def __init__(self, expr_name, author):
-        self.expr_name = expr_name
-        self.author = author
-        self.expr_path = os.path.join(base_dir, 'experiments', expr_name)
-        self.expr_id = None
-        self.nni_port = None
-        self.nni_create_result = None
-        self.server = 'localhost'
-        self.success_msg = "Successfully started experiment!"
+    def excute(self):
+        self.watch_process()
+        self.model_final_update()
 
-    def get_free_port(self):
-        """
-        호출 즉시 사용가능한 포트번호를 반환합니다.
+    def get_running_experiment(self):
+        self._experiment_list = subprocess.getoutput("nnictl experiment list")
+        self._running_experiment = [
+            expr
+            for expr in self._experiment_list.split("\n")
+            if self.experiment_id in expr
+        ]
+        L.info(self._running_experiment)
 
-        Returns:
-            현재 사용가능한 포트번호
+    def watch_process(self):
+        if self.is_kill:
+            while True:
+                self.get_running_experiment()
+                if self._running_experiment and ("DONE" in self._running_experiment[0]):
+                    _stop_expr = subprocess.getoutput(
+                        "nnictl stop {}".format(self.experiment_id)
+                    )
+                    L.info(_stop_expr)
+                    break
 
-        Examples:
-            >>> avail_port = get_free_port() # 사용 가능한 포트, 그때그때 다름
-            >>> print(avail_port)
-            45675
-        """
-        with socketserver.TCPServer((self.server, 0), None) as s:
-            self.nni_port = s.server_address[1]
+                elif self.experiment_id not in self._experiment_list:
+                    L.error("Experiment ID not in Current Experiment List")
+                    L.info(self._experiment_list)
+                    break
 
-    def init_nni_process(self):
-        self.nni_create_result = subprocess.getoutput(
-            "nnictl create --port {} --config {}/config.yml".format(
-                self.nni_port, self.expr_path))
+                else:
+                    if self.is_update:
+                        self.model_keep_update()
+                time.sleep(self._wait_minute)
 
-    def check_nni_process(self):
-        if self.success_msg in self.nni_create_result:
-            p = re.compile(r"The experiment id is ([a-zA-Z0-9]+)\n")
-            self.expr_id = p.findall(self.nni_create_result)[0]
-            m_process = multiprocessing.Process(
-                target=self.control_nni_function
+    def model_keep_update(self):
+        engine.execute(
+            UPDATE_TEMP_MODEL_DATA.format(
+                self.experiment_name, self.evaluation_criteria, self.top_cnt
             )
-            m_process.start()
-            L.info(self.nni_create_result)
-            return self.nni_create_result
+        )
 
-        else:
-            L.error(self.nni_create_result)
-            return self.nni_create_result
+    def model_final_update(self):
+        final_result = engine.execute(
+            SELECT_TEMP_MODEL_BY_EXPR_NAME.format(
+                self.experiment_name, self.evaluation_criteria
+            )
+        ).fetchone()
 
-    def control_nni_function(self):  # check_nni_process 안에서 실행되는 method
-        raise Exception
+        saved_result = engine.execute(
+            SELECT_MODEL_METADATA_BY_EXPR_NAME.format(self.experiment_name)
+        ).fetchone()
 
-    def check_function(self):
-        raise Exception
+        a = pickle.loads(codecs.decode(final_result.model_file, "base64"))
+        pickled_model = codecs.encode(pickle.dumps(a), "base64").decode()
 
-    def execute(self):
-        self.check_function()
+        if saved_result is None:
+            engine.execute(
+                INSERT_MODEL_CORE.format(final_result.model_name, pickled_model)
+            )
+            engine.execute(
+                INSERT_MODEL_METADATA.format(
+                    self.experiment_name,
+                    final_result.model_name,
+                    self.experimenter,
+                    self.version,
+                    final_result.train_mae,
+                    final_result.val_mae,
+                    final_result.train_mse,
+                    final_result.val_mse,
+                )
+            )
+        elif (
+            saved_result[self.evaluation_criteria]
+            > final_result[self.evaluation_criteria]
+        ):
+            engine.execute(
+                UPDATE_MODEL_CORE.format(pickled_model, saved_result.model_name)
+            )
+            engine.execute(
+                UPDATE_MODEL_METADATA.format(
+                    final_result.train_mae,
+                    final_result.val_mae,
+                    final_result.train_mse,
+                    final_result.val_mse,
+                    self.experiment_name,
+                )
+            )
 
-
-class TensorflowNniExperiments(CoreNniExperiments):
-    def __init__(self, *args):
-        super().__init__(*args)
-        self.minute = 60
-
-    def check_function(self):
-        # 논리흐름대로 실행시키기
-        super().get_free_port()
-        super().init_nni_process()  # nni process 실행시키기
-        super().check_nni_process()  # control_nni_function을 쓰는 check_nni_process 실행
-
-    def control_nni_function(self):
-        while True:
-            time.sleep(1 * self.minute)
-            expr_list = subprocess.getoutput('nnictl experiment list')
-            running_expr = [expr for expr in expr_list.split(
-                '\n') if self.expr_id in expr]
-
-            if running_expr and ("DONE" in running_expr[0]):
-                self.nni_stop()
-                break
-
-            elif self.expr_id not in expr_list:
-                L.info(expr_list)
-                break
-
-            else:
-                self.left_3_models()
-
-        model_path = os.path.join(self.expr_path,
-                                  "temp",
-                                  "*_{}*".format(self.expr_name))
-        exprs = glob.glob(model_path)
-        if not exprs:
-            return 0
-
-        exprs.sort()
-        exprs = exprs[0]
-        metrics = os.path.basename(exprs).split("_")[:2]
-        metrics = [float(metric) for metric in metrics]
-
-        score_sql = """SELECT mae 
-                    FROM atmos_model_metadata
-                    ORDER BY mae;"""
-        saved_score = engine.execute(score_sql).fetchone()
-
-        if not saved_score or (metrics[0] < saved_score[0]):
-            winner_model = os.path.join(os.path.join(self.expr_path,
-                                                     "temp",
-                                                     self.expr_name))
-            os.rename(exprs, winner_model)
-            m_buffer = zip_model(winner_model)
-            encode_model = codecs.encode(
-                pickle.dumps(m_buffer), "base64").decode()
-            sql_save_model = "INSERT INTO model_core VALUES ('%s', '%s')"
-            engine.execute(sql_save_model % (self.expr_name,
-                                             encode_model))
-
-            sql_save_score = "INSERT INTO atmos_model_metadata VALUES ('%s', '%s', '%s', '%s')"
-            engine.execute(sql_save_score % (self.expr_name,
-                                             self.expr_id,
-                                             metrics[0],
-                                             metrics[1]))
-            L.info("saved model %s %s" % (self.expr_id, self.expr_name))
-
-    def nni_stop(self):
-        stop_expr = subprocess.getoutput("nnictl stop {}".format(
-            self.expr_id))
-        L.info(stop_expr)
-
-    def left_3_models(self):
-        model_path = os.path.join(self.expr_path,
-                                  "temp",
-                                  "*_{}*".format(self.expr_name))
-        exprs = glob.glob(model_path)
-        if len(exprs) > 3:
-            exprs.sort()
-            [shutil.rmtree(_) for _ in exprs[3:]]
+        engine.execute(DELETE_ALL_EXPERIMENTS_BY_EXPR_NAME.format(self.experiment_name))
 
 
 def zip_model(model_path):
@@ -328,8 +304,10 @@ def zip_model(model_path):
 
     with zipfile.ZipFile(model_buffer, "w") as zf:
         for root, dirs, files in os.walk(model_path):
-            def make_arcname(x): return os.path.join(
-                root.split(basedir)[-1], x)
+
+            def make_arcname(x):
+                return os.path.join(root.split(basedir)[-1], x)
+
             for dr in dirs:
                 dir_path = os.path.join(root, dr)
                 zf.write(filename=dir_path, arcname=make_arcname(dr))
@@ -372,16 +350,14 @@ def check_expr_over(experiment_id, experiment_name, experiment_path):
     minute = 60
 
     while True:
-        time.sleep(1*minute)
+        time.sleep(1 * minute)
 
         expr_list = subprocess.getoutput("nnictl experiment list")
 
-        running_expr = [expr for expr in expr_list.split(
-            '\n') if experiment_id in expr]
+        running_expr = [expr for expr in expr_list.split("\n") if experiment_id in expr]
         print(running_expr)
         if running_expr and ("DONE" in running_expr[0]):
-            stop_expr = subprocess.getoutput("nnictl stop {}".format(
-                                             experiment_id))
+            stop_expr = subprocess.getoutput("nnictl stop {}".format(experiment_id))
             L.info(stop_expr)
             break
 
@@ -390,17 +366,15 @@ def check_expr_over(experiment_id, experiment_name, experiment_path):
             break
 
         else:
-            model_path = os.path.join(experiment_path,
-                                      "temp",
-                                      "*_{}*".format(experiment_name))
+            model_path = os.path.join(
+                experiment_path, "temp", "*_{}*".format(experiment_name)
+            )
             exprs = glob.glob(model_path)
             if len(exprs) > 3:
                 exprs.sort()
                 [shutil.rmtree(_) for _ in exprs[3:]]
 
-    model_path = os.path.join(experiment_path,
-                              "temp",
-                              "*_{}*".format(experiment_name))
+    model_path = os.path.join(experiment_path, "temp", "*_{}*".format(experiment_name))
     exprs = glob.glob(model_path)
     if not exprs:
         return 0
@@ -416,19 +390,19 @@ def check_expr_over(experiment_id, experiment_name, experiment_path):
     saved_score = engine.execute(score_sql).fetchone()
 
     if not saved_score or (metrics[0] < saved_score[0]):
-        winner_model = os.path.join(os.path.join(experiment_path,
-                                                 "temp",
-                                                 experiment_name))
+        winner_model = os.path.join(
+            os.path.join(experiment_path, "temp", experiment_name)
+        )
         os.rename(exprs, winner_model)
         m_buffer = zip_model(winner_model)
         encode_model = codecs.encode(pickle.dumps(m_buffer), "base64").decode()
         sql_save_model = "INSERT INTO model_core VALUES ('%s', '%s')"
-        engine.execute(sql_save_model % (experiment_name,
-                                         encode_model))
+        engine.execute(sql_save_model % (experiment_name, encode_model))
 
-        sql_save_score = "INSERT INTO atmos_model_metadata VALUES ('%s', '%s', '%s', '%s')"
-        engine.execute(sql_save_score % (experiment_name,
-                                         experiment_id,
-                                         metrics[0],
-                                         metrics[1]))
+        sql_save_score = (
+            "INSERT INTO atmos_model_metadata VALUES ('%s', '%s', '%s', '%s')"
+        )
+        engine.execute(
+            sql_save_score % (experiment_name, experiment_id, metrics[0], metrics[1])
+        )
         L.info("saved model %s %s" % (experiment_id, experiment_name))

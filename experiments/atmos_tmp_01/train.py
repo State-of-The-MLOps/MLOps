@@ -2,6 +2,7 @@ import os
 import sys
 import time
 from preprocessing import preprocess
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import numpy as np
@@ -15,9 +16,10 @@ from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from tensorflow.keras.layers import GRU
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
+
 from expr_db import connect
 
-physical_devices = tf.config.list_physical_devices('GPU')
+physical_devices = tf.config.list_physical_devices("GPU")
 if physical_devices:
     tf.config.experimental.set_memory_growth(physical_devices[0], enable=True)
 
@@ -104,9 +106,9 @@ def main(params):
     if not os.path.exists(model_path):
         os.makedirs(model_path)
 
-    # 실험시작시간은 여러 모델간의 구분을 위해 임시로 넣었지만 
+    # 실험시작시간은 여러 모델간의 구분을 위해 임시로 넣었지만
     # 여러 워커를 동시에 실행시킬 경우 겹칠 수 있음. 추후 변경 필요!!
-    filename = os.path.join(model_path, f'./{parent_dir}_{expr_time}')
+    filename = os.path.join(model_path, f"./{parent_dir}_{expr_time}")
     print(filename)
     checkpoint = ModelCheckpoint(
         filename,
@@ -125,15 +127,16 @@ def main(params):
         callbacks=[early_stop, checkpoint],
     )
 
-
     y_true = y_test.reshape(y_test.shape[0], y_test.shape[1])
     y_hat = model.predict(X_test)
-    
+
     mae = mean_absolute_error(y_true, y_hat)
     mse = mean_squared_error(y_true, y_hat)
 
-    src_f = os.path.join(model_path, f'./{parent_dir}_{expr_time}')
-    dst_f = os.path.join(model_path, f'./{mae:.03f}_{mse:.03f}_{parent_dir}_{expr_time}')
+    src_f = os.path.join(model_path, f"./{parent_dir}_{expr_time}")
+    dst_f = os.path.join(
+        model_path, f"./{mae:.03f}_{mse:.03f}_{parent_dir}_{expr_time}"
+    )
     os.rename(src_f, dst_f)
 
     nni.report_final_result(mae)

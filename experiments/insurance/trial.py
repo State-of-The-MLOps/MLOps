@@ -1,24 +1,26 @@
-import os
 import codecs
+import getopt
+import os
 import pickle
 import sys
-import getopt
-sys.path.append(os.path.dirname( os.path.dirname( os.path.abspath(__file__) ) ))
 
-from dotenv import load_dotenv
-import pandas as pd
-import numpy as np
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
 import nni
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_absolute_error, mean_squared_error
-from sklearn.preprocessing import LabelEncoder
-from sklearn.model_selection import KFold
-from xgboost.sklearn import XGBRegressor
-
+import numpy as np
+import pandas as pd
+from dotenv import load_dotenv
 from expr_db import connect
 from query import *
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.model_selection import KFold, train_test_split
+from sklearn.preprocessing import LabelEncoder
+from xgboost.sklearn import XGBRegressor
 
 load_dotenv(verbose=True)
+
 
 def preprocess(x_train, x_valid, col_list):
     """
@@ -39,8 +41,7 @@ def preprocess(x_train, x_valid, col_list):
     encoder = LabelEncoder()
 
     for col in col_list:
-        tmp_x_train.loc[:, col] = encoder.fit_transform(
-            tmp_x_train.loc[:, col])
+        tmp_x_train.loc[:, col] = encoder.fit_transform(tmp_x_train.loc[:, col])
         tmp_x_valid.loc[:, col] = encoder.transform(tmp_x_valid.loc[:, col])
 
     return tmp_x_train.values, tmp_x_valid.values
@@ -56,18 +57,19 @@ def main(params, engine, experiment_info, connection):
     """
 
     df = pd.read_sql(SELECT_ALL_INSURANCE, engine)
-    experimenter = experiment_info['experimenter']
-    experiment_name = experiment_info['experiment_name']
-    model_name = experiment_info['model_name']
-    version = experiment_info['version']
+    experimenter = experiment_info["experimenter"]
+    experiment_name = experiment_info["experiment_name"]
+    model_name = experiment_info["model_name"]
+    version = experiment_info["version"]
 
-    label_col = ['sex', 'smoker', 'region']
+    label_col = ["sex", "smoker", "region"]
 
     y = df.charges.to_frame()
     x = df.iloc[:, :-1]
 
     x_train, x_valid, y_train, y_valid = train_test_split(
-        x, y, test_size=0.2, random_state=42)
+        x, y, test_size=0.2, random_state=42
+    )
 
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
 
@@ -85,8 +87,7 @@ def main(params, engine, experiment_info, connection):
         model = XGBRegressor(**params)
 
         # 모델 학습 및 Early Stopping 적용
-        model.fit(x_tra, y_train, eval_set=[
-                  (x_val, y_valid)], early_stopping_rounds=10)
+        model.fit(x_tra, y_train, eval_set=[(x_val, y_valid)], early_stopping_rounds=10)
 
         y_train_pred = model.predict(x_tra)
         y_valid_pred = model.predict(x_val)
@@ -109,48 +110,28 @@ def main(params, engine, experiment_info, connection):
     cv_mae_mean = np.mean(cv_mae)
     tr_mse_mean = np.mean(tr_mse)
     tr_mae_mean = np.mean(tr_mae)
+    pickled_model = codecs.encode(pickle.dumps(fold_model), "base64").decode()
 
-    best_model = pd.read_sql(SELECT_MODEL_CORE % (model_name), engine)
-
-    if len(best_model) == 0:
-
-        pickled_model = codecs.encode(pickle.dumps(model), "base64").decode()
-        connection.execute(INSERT_MODEL_CORE % (model_name, pickled_model))
-        connection.execute(INSERT_MODEL_METADATA % (
-            experiment_name,
+    connection.execute(
+        INSERT_TEMP_MODEL.format(
             model_name,
+            pickled_model,
+            experiment_name,
             experimenter,
             version,
             tr_mae_mean,
-            tr_mse_mean,
             cv_mae_mean,
-            cv_mse_mean)
+            tr_mse_mean,
+            cv_mse_mean,
         )
-
-    else:
-        best_model_metadata = pd.read_sql(
-            SELECT_VAL_MAE % (model_name), engine)
-        saved_score = best_model_metadata.values[0]
-
-        if saved_score > valid_mae:
-            pickled_model = codecs.encode(
-                pickle.dumps(fold_model), "base64").decode()
-
-            connection.execute(UPDATE_MODEL_CORE % (pickled_model, model_name))
-            connection.execute(UPDATE_MODEL_METADATA % (
-                tr_mae_mean,
-                cv_mae_mean,
-                tr_mse_mean,
-                cv_mse_mean,
-                experiment_name)
-            )
+    )
 
     nni.report_final_result(cv_mae_mean)
-    print('Final result is %g', cv_mae_mean)
-    print('Send final result done.')
+    print("Final result is %g", cv_mae_mean)
+    print("Send final result done.")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     params = nni.get_next_parameter()
     engine = connect()
     argv = sys.argv
@@ -160,21 +141,17 @@ if __name__ == '__main__':
         opts, etc_args = getopt.getopt(
             argv[1:],
             "e:n:m:v:",
-            [
-                "experimenter=",
-                "experiment_name=",
-                "model_name=",
-                "version="
-            ])
+            ["experimenter=", "experiment_name=", "model_name=", "version="],
+        )
         for opt, arg in opts:
-            if opt in ('-e', "--experimenter"):
-                experiment_info['experimenter'] = f"'{arg}'"
+            if opt in ("-e", "--experimenter"):
+                experiment_info["experimenter"] = f"'{arg}'"
             elif opt in ("-n", "--experiment_name"):
-                experiment_info['experiment_name'] = f"'{arg}'"
+                experiment_info["experiment_name"] = f"'{arg}'"
             elif opt in ("-m", "--model_name"):
-                experiment_info['model_name'] = f"'{arg}'"
+                experiment_info["model_name"] = f"'{arg}'"
             elif opt in ("-v", "--version"):
-                experiment_info['version'] = arg
+                experiment_info["version"] = arg
 
     except getopt.GetoptError:
         sys.exit(2)

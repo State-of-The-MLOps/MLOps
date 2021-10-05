@@ -1,3 +1,30 @@
+# insert temp
+
+INSERT_TEMP_MODEL = """
+            INSERT INTO temp_model_data (
+                model_name,
+                model_file,
+                experiment_name,
+                experimenter,
+                version,
+                train_mae,
+                val_mae,
+                train_mse,
+                val_mse
+            ) VALUES (
+                {},
+                '{}',
+                {},
+                {},
+                {},
+                {},
+                {},
+                {},
+                {}
+            )
+"""
+
+
 # INSERT
 INSERT_MODEL_CORE = """
             INSERT INTO model_core (
