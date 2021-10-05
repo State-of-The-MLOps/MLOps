@@ -296,7 +296,7 @@ def zip_model(model_path):
         memory buffer: 모델을 압축한 메모리 버퍼를 반환합니다.
 
     Note:
-        모델을 보조기억장치에 파일로 저장하지 않습니다.
+        모델을 디스크에 파일로 저장하지 않습니다.
     """
     model_buffer = io.BytesIO()
 
@@ -406,3 +406,97 @@ def check_expr_over(experiment_id, experiment_name, experiment_path):
             sql_save_score % (experiment_name, experiment_id, metrics[0], metrics[1])
         )
         L.info("saved model %s %s" % (experiment_id, experiment_name))
+
+
+class ExprimentOwl:
+    
+    def __init__(self, experiment_id, experiment_name, experiment_path, mfile_manage = True, time = 5):
+        self.__minute = 60
+        self.time = time * self.__minute
+        self.experiment_id = experiment_id
+        self.experiment_name = experiment_name
+        self.experiment_path = experiment_path
+        self.mfile_manage = mfile_manage
+        self.__func_list = [self.main]
+
+
+    def execute(self):
+        for func in self.__func_list:
+            func()
+
+
+    def add(self, func_name):
+        func = getattr(self, func_name)
+        self.__func_list.append(func)
+
+
+    def main(self):
+        while True:
+            time.sleep(self.__minute)
+
+            expr_list = subprocess.getoutput("nnictl experiment list")
+
+            running_expr = [expr for expr in expr_list.split("\n") if self.experiment_id in expr]
+            print(running_expr)
+            if running_expr and ("DONE" in running_expr[0]):
+                stop_expr = subprocess.getoutput("nnictl stop {}".format(self.experiment_id))
+                L.info(stop_expr)
+                break
+
+            elif self.experiment_id not in expr_list:
+                L.info(expr_list)
+                break
+
+            else:
+                if self.mfile_manage:
+                    model_path = os.path.join(
+                        self.experiment_path, "temp", "*_{}*".format(self.experiment_name)
+                    )
+                    exprs = glob.glob(model_path)
+                    if len(exprs) > 3:
+                        exprs.sort()
+                        [shutil.rmtree(_) for _ in exprs[3:]]
+
+
+    def update_tfmodeldb(self):
+        model_path = os.path.join(self.experiment_path, "temp", "*_{}*".format(self.experiment_name))
+        exprs = glob.glob(model_path)
+        if not exprs:
+            return 0
+
+        exprs.sort()
+        exprs = exprs[0]
+        metrics = os.path.basename(exprs).split("_")[:2]
+        metrics = [float(metric) for metric in metrics]
+
+        score_sql = """SELECT mae 
+                       FROM atmos_model_metadata
+                       WHERE model_name = '{}'
+                       ORDER BY mae;""".format(self.experiment_name)
+        saved_score = engine.execute(score_sql).fetchone()
+
+        if not saved_score or (metrics[0] < saved_score[0]):
+            winner_model = os.path.join(
+                os.path.join(self.experiment_path, "temp", self.experiment_name)
+            )
+            os.rename(exprs, winner_model)
+            m_buffer = zip_model(winner_model)
+            encode_model = codecs.encode(pickle.dumps(m_buffer), "base64").decode()
+
+            engine.execute(INSERT_OR_UPDATE_MODEL.format(mn=self.experiment_name, 
+                                                         mf=encode_model))
+
+            engine.execute(
+                INSERT_OR_UPDATE_SCORE.format(mn = self.experiment_name,
+                                              expr_id = self.experiment_id,
+                                              score1 = metrics[0],
+                                              score2 = metrics[1])
+            )
+            L.info("saved model %s %s" % (self.experiment_id, self.experiment_name))
+
+    def modelfile_cleaner(self):
+        model_path = os.path.join(
+            self.experiment_path, "temp", "*_{}*".format(self.experiment_name)
+        )
+        exprs = glob.glob(model_path)
+        [shutil.rmtree(_) for _ in exprs]

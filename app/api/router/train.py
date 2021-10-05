@@ -6,7 +6,7 @@ import subprocess
 
 from fastapi import APIRouter
 
-from app.utils import NniWatcher, base_dir, check_expr_over, get_free_port, write_yml
+from app.utils import NniWatcher, ExprimentOwl, base_dir, check_expr_over, get_free_port, write_yml
 from logger import L
 
 router = APIRouter(
@@ -90,8 +90,12 @@ def train_atmos(expr_name: str):
         if sucs_msg in nni_create_result:
             p = re.compile(r"The experiment id is ([a-zA-Z0-9]+)\n")
             expr_id = p.findall(nni_create_result)[0]
+            check_expr = ExprimentOwl(expr_id, expr_name, expr_path)
+            check_expr.add("update_tfmodeldb")
+            check_expr.add("modelfile_cleaner")
+            
             m_process = multiprocessing.Process(
-                target=check_expr_over, args=(expr_id, expr_name, expr_path)
+                target=check_expr.execute
             )
             m_process.start()
 

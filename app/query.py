@@ -78,3 +78,25 @@ DELETE_ALL_EXPERIMENTS_BY_EXPR_NAME = """
     DELETE FROM temp_model_data
     WHERE experiment_name = '{}'
 """
+
+INSERT_OR_UPDATE_MODEL = """
+UPDATE model_core
+SET model_name='{mn}', model_file='{mf}'
+WHERE model_core.model_name='{mn}';
+INSERT INTO model_core (model_name, model_file)
+SELECT '{mn}', '{mf}'
+WHERE NOT EXISTS (SELECT 1 
+				 FROM model_core as mc 
+				 WHERE mc.model_name = '{mn}');
+"""
+
+INSERT_OR_UPDATE_SCORE = """
+UPDATE atmos_model_metadata 
+SET mae='{score1}', mse='{score2}'
+WHERE atmos_model_metadata.model_name='{mn}';
+INSERT INTO atmos_model_metadata (model_name, experiment_id, mae, mse)
+SELECT '{mn}', '{expr_id}', '{score1}', '{score2}'
+WHERE NOT EXISTS (SELECT 1 
+				 FROM atmos_model_metadata as amm 
+				 WHERE amm.model_name = '{mn}');
+"""
