@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import datetime
 
+
 from sqlalchemy import Column, Integer, String, FLOAT, DateTime, ForeignKey, LargeBinary
 from sqlalchemy.sql.functions import now
 from sqlalchemy.orm import relationship
@@ -11,21 +12,23 @@ KST = datetime.timezone(datetime.timedelta(hours=9))
 
 
 class ModelCore(Base):
-    __tablename__ = 'model_core'
+    __tablename__ = "model_core"
 
     model_name = Column(String, primary_key=True)
     model_file = Column(LargeBinary, nullable=False)
 
     model_metadata_relation = relationship(
-        "ModelMetadata", backref="model_core.model_name")
+        "ModelMetadata", backref="model_core.model_name"
+    )
 
 
 class ModelMetadata(Base):
-    __tablename__ = 'model_metadata'
+    __tablename__ = "model_metadata"
 
     experiment_name = Column(String, primary_key=True)
-    model_core_name = Column(String, ForeignKey(
-        'model_core.model_name'), nullable=False)
+    model_core_name = Column(
+        String, ForeignKey("model_core.model_name"), nullable=False
+    )
     experimenter = Column(String, nullable=False)
     version = Column(FLOAT)
     train_mae = Column(FLOAT, nullable=False)
@@ -36,7 +39,7 @@ class ModelMetadata(Base):
 
 
 class TempModelData(Base):
-    __tablename__ = 'temp_model_data'
+    __tablename__ = "temp_model_data"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     model_name = Column(String, nullable=False)

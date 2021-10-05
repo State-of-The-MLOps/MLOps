@@ -15,7 +15,6 @@ import zipfile
 import tensorflow as tf
 import yaml
 
-
 from app.database import engine
 from app.query import *
 from logger import L
