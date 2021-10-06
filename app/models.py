@@ -1,10 +1,17 @@
 # -*- coding: utf-8 -*-
 import datetime
 
-
-from sqlalchemy import Column, Integer, String, FLOAT, DateTime, ForeignKey, LargeBinary
-from sqlalchemy.sql.functions import now
+from sqlalchemy import (
+    FLOAT,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    LargeBinary,
+    String,
+)
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql.functions import now
 
 from app.database import Base
 

@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 from typing import List
 
-
 import numpy as np
 from fastapi import APIRouter
 from starlette.concurrency import run_in_threadpool
@@ -12,12 +11,13 @@ from app.database import engine
 from app.utils import ScikitLearnModel, my_model
 from logger import L
 
-
 models.Base.metadata.create_all(bind=engine)
 
 
 router = APIRouter(
-    prefix="/predict", tags=["predict"], responses={404: {"description": "Not Found"}}
+    prefix="/predict",
+    tags=["predict"],
+    responses={404: {"description": "Not Found"}},
 )
 
 

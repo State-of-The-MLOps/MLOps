@@ -4,7 +4,6 @@ import os
 import pickle
 import sys
 
-
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
@@ -41,7 +40,9 @@ def preprocess(x_train, x_valid, col_list):
     encoder = LabelEncoder()
 
     for col in col_list:
-        tmp_x_train.loc[:, col] = encoder.fit_transform(tmp_x_train.loc[:, col])
+        tmp_x_train.loc[:, col] = encoder.fit_transform(
+            tmp_x_train.loc[:, col]
+        )
         tmp_x_valid.loc[:, col] = encoder.transform(tmp_x_valid.loc[:, col])
 
     return tmp_x_train.values, tmp_x_valid.values
@@ -87,7 +88,12 @@ def main(params, engine, experiment_info, connection):
         model = XGBRegressor(**params)
 
         # 모델 학습 및 Early Stopping 적용
-        model.fit(x_tra, y_train, eval_set=[(x_val, y_valid)], early_stopping_rounds=10)
+        model.fit(
+            x_tra,
+            y_train,
+            eval_set=[(x_val, y_valid)],
+            early_stopping_rounds=10,
+        )
 
         y_train_pred = model.predict(x_tra)
         y_valid_pred = model.predict(x_val)

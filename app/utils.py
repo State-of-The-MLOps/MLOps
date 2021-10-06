@@ -11,7 +11,6 @@ import subprocess
 import time
 import zipfile
 
-
 import tensorflow as tf
 import yaml
 
@@ -239,7 +238,9 @@ class NniWatcher:
         if self.is_kill:
             while True:
                 self.get_running_experiment()
-                if self._running_experiment and ("DONE" in self._running_experiment[0]):
+                if self._running_experiment and (
+                    "DONE" in self._running_experiment[0]
+                ):
                     _stop_expr = subprocess.getoutput(
                         "nnictl stop {}".format(self.experiment_id)
                     )
@@ -284,7 +285,9 @@ class NniWatcher:
 
         if saved_result is None:
             engine.execute(
-                INSERT_MODEL_CORE.format(final_result.model_name, pickled_model)
+                INSERT_MODEL_CORE.format(
+                    final_result.model_name, pickled_model
+                )
             )
             engine.execute(
                 INSERT_MODEL_METADATA.format(
@@ -303,7 +306,9 @@ class NniWatcher:
             > final_result[self.evaluation_criteria]
         ):
             engine.execute(
-                UPDATE_MODEL_CORE.format(pickled_model, saved_result.model_name)
+                UPDATE_MODEL_CORE.format(
+                    pickled_model, saved_result.model_name
+                )
             )
             engine.execute(
                 UPDATE_MODEL_METADATA.format(
@@ -315,7 +320,9 @@ class NniWatcher:
                 )
             )
 
-        engine.execute(DELETE_ALL_EXPERIMENTS_BY_EXPR_NAME.format(self.experiment_name))
+        engine.execute(
+            DELETE_ALL_EXPERIMENTS_BY_EXPR_NAME.format(self.experiment_name)
+        )
 
 
 def zip_model(model_path):
@@ -401,7 +408,12 @@ class ExperimentOwl:
     """
 
     def __init__(
-        self, experiment_id, experiment_name, experiment_path, mfile_manage=True, time=5
+        self,
+        experiment_id,
+        experiment_name,
+        experiment_path,
+        mfile_manage=True,
+        time=5,
     ):
         self.__minute = 60
         self.time = time * self.__minute
@@ -434,7 +446,9 @@ class ExperimentOwl:
             expr_list = subprocess.getoutput("nnictl experiment list")
 
             running_expr = [
-                expr for expr in expr_list.split("\n") if self.experiment_id in expr
+                expr
+                for expr in expr_list.split("\n")
+                if self.experiment_id in expr
             ]
             print(running_expr)
             if running_expr and ("DONE" in running_expr[0]):
@@ -486,17 +500,23 @@ class ExperimentOwl:
 
         if not saved_score or (metrics[0] < saved_score[0]):
             winner_model = os.path.join(
-                os.path.join(self.experiment_path, "temp", self.experiment_name)
+                os.path.join(
+                    self.experiment_path, "temp", self.experiment_name
+                )
             )
             if os.path.exists:
                 shutil.rmtree(winner_model)
             os.rename(exprs, winner_model)
 
             m_buffer = zip_model(winner_model)
-            encode_model = codecs.encode(pickle.dumps(m_buffer), "base64").decode()
+            encode_model = codecs.encode(
+                pickle.dumps(m_buffer), "base64"
+            ).decode()
 
             engine.execute(
-                INSERT_OR_UPDATE_MODEL.format(mn=self.experiment_name, mf=encode_model)
+                INSERT_OR_UPDATE_MODEL.format(
+                    mn=self.experiment_name, mf=encode_model
+                )
             )
             engine.execute(
                 INSERT_OR_UPDATE_SCORE.format(
@@ -506,7 +526,10 @@ class ExperimentOwl:
                     score2=metrics[1],
                 )
             )
-            L.info("saved model %s %s" % (self.experiment_id, self.experiment_name))
+            L.info(
+                "saved model %s %s"
+                % (self.experiment_id, self.experiment_name)
+            )
 
     def modelfile_cleaner(self):
         """
