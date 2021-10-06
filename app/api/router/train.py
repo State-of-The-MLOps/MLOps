@@ -56,11 +56,11 @@ def train_insurance(
             m_process.start()
 
             L.info(nni_create_result)
-            return nni_create_result
+            return {"msg": nni_create_result, "error": None}
 
     except Exception as e:
         L.error(e)
-        return {"error": str(e)}
+        return {"msg": "Can't start experiment", "error": str(e)}
 
 
 @router.put("/atmos")
@@ -93,10 +93,8 @@ def train_atmos(expr_name: str):
             check_expr = ExperimentOwl(expr_id, expr_name, expr_path)
             check_expr.add("update_tfmodeldb")
             check_expr.add("modelfile_cleaner")
-            
-            m_process = multiprocessing.Process(
-                target=check_expr.execute
-            )
+
+            m_process = multiprocessing.Process(target=check_expr.execute)
             m_process.start()
 
             L.info(nni_create_result)
@@ -104,8 +102,8 @@ def train_atmos(expr_name: str):
 
         else:
             L.error(nni_create_result)
-            return {"error": nni_create_result}
+            return {"msg": nni_create_result, "error": None}
 
     except Exception as e:
         L.error(e)
-        return {"error": str(e)}
+        return {"msg": "Can't start experiment", "error": str(e)}

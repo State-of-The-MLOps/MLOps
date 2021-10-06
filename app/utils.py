@@ -174,22 +174,22 @@ class NniWatcher:
     experiment_id를 입력받아 해당 id를 가진 nni 실험을 모니터링하고 모델 파일을 관리해주는 클래스입니다.
     생성되는 scikit learn 모델을 DB의 임시 테이블에 저장하여 주기적으로 업데이트 합니다.
     이후 실험의 모든 프로세스가 종료되면 가장 성능이 좋은 모델과 점수를 업데이트 합니다.
-    
+
     Attributes:
         experiment_id(str): nni experiment를 실행할 때 생성되는 id
         experiment_name(str): 실험의 이름
         experimenter(str): 실험자의 이름
         version(str): 실험의 버전
         minute(int): 감시 주기
-        is_kill(bool, default=True)
-        is_update(bool, default=True)
-        top_cnt(int, default=3)
-        evaluation_criteria(str, default="val_mae")
+        is_kill(bool, default=True): 실험 감시하며 실험이 끝나면 종료할지 결정하는 변수
+        top_cnt(int, default=3): 임시로 최대 몇개의 실험을 저장할지 결정하는 변수
+        evaluation_criteria(str, default="val_mae"): 어떤 평가기준으로 모델을 업데이트 할지 결정하는 변수
 
     Examples:
         >>> watcher = NniWatcher(expr_id, experiment_name, experimenter, version)
         >>> watcher.execute()
     """
+
     def __init__(
         self,
         experiment_id,
@@ -198,7 +198,6 @@ class NniWatcher:
         version,
         minute=1,
         is_kill=True,
-        is_update=True,
         top_cnt=3,
         evaluation_criteria="val_mae",
     ):
@@ -207,7 +206,6 @@ class NniWatcher:
         self.experimenter = experimenter
         self.version = version
         self.is_kill = is_kill
-        self.is_update = is_update
         self.top_cnt = top_cnt
         self.evaluation_criteria = evaluation_criteria
         self._wait_minute = minute * 20
@@ -254,8 +252,7 @@ class NniWatcher:
                     break
 
                 else:
-                    if self.is_update:
-                        self.model_keep_update()
+                    self.model_keep_update()
                 time.sleep(self._wait_minute)
 
     def model_keep_update(self):
@@ -380,7 +377,7 @@ class ExperimentOwl:
     1. (기본)nnictl experiment list(shell command)를 주기적으로 호출하여 실험이 현재 진행중인지 파악합니다.
        실험의 상태가 DONE으로 변경되면 최고점수 모델을 데이터베이스에 저장하고 nnictl stop experiment_id를 실행하여 실험을 종료한 후 프로세스가 종료됩니다.
 
-    2. 파일로 생성되는 모델이 너무 많아지지 않도록 유지합니다.(3개 이상 모델이 생성되면 성능순으로 3위 미만은 삭제) instance 생성 시 
+    2. 파일로 생성되는 모델이 너무 많아지지 않도록 유지합니다.(3개 이상 모델이 생성되면 성능순으로 3위 미만은 삭제) instance 생성 시
        mfile_manage = False로 기능을 사용하지 않을 수 있습니다.(default True)
 
     3. (method) update_tfmodelbd
@@ -403,7 +400,9 @@ class ExperimentOwl:
         >>> owl.execute()
     """
 
-    def __init__(self, experiment_id, experiment_name, experiment_path, mfile_manage = True, time = 5):
+    def __init__(
+        self, experiment_id, experiment_name, experiment_path, mfile_manage=True, time=5
+    ):
         self.__minute = 60
         self.time = time * self.__minute
         self.experiment_id = experiment_id
@@ -412,7 +411,6 @@ class ExperimentOwl:
         self.mfile_manage = mfile_manage
         self.__func_list = [self.main]
 
-
     def execute(self):
         """
         instance.add("method name")으로 저장된 메서드들을 순서대로 모두 실행시킵니다.
@@ -420,11 +418,9 @@ class ExperimentOwl:
         for func in self.__func_list:
             func()
 
-
     def add(self, func_name):
         func = getattr(self, func_name)
         self.__func_list.append(func)
-
 
     def main(self):
         """
@@ -437,10 +433,14 @@ class ExperimentOwl:
 
             expr_list = subprocess.getoutput("nnictl experiment list")
 
-            running_expr = [expr for expr in expr_list.split("\n") if self.experiment_id in expr]
+            running_expr = [
+                expr for expr in expr_list.split("\n") if self.experiment_id in expr
+            ]
             print(running_expr)
             if running_expr and ("DONE" in running_expr[0]):
-                stop_expr = subprocess.getoutput("nnictl stop {}".format(self.experiment_id))
+                stop_expr = subprocess.getoutput(
+                    "nnictl stop {}".format(self.experiment_id)
+                )
                 L.info(stop_expr)
                 break
 
@@ -451,19 +451,22 @@ class ExperimentOwl:
             else:
                 if self.mfile_manage:
                     model_path = os.path.join(
-                        self.experiment_path, "temp", "*_{}*".format(self.experiment_name)
+                        self.experiment_path,
+                        "temp",
+                        "*_{}*".format(self.experiment_name),
                     )
                     exprs = glob.glob(model_path)
                     if len(exprs) > 3:
                         exprs.sort()
                         [shutil.rmtree(_) for _ in exprs[3:]]
 
-
     def update_tfmodeldb(self):
         """
         실험이 종료되면 모델을 DB에 저장하거나 이미 같은 이름의 모델이 존재할 시 점수를 비교하여 업데이트 합니다.
         """
-        model_path = os.path.join(self.experiment_path, "temp", "*_{}*".format(self.experiment_name))
+        model_path = os.path.join(
+            self.experiment_path, "temp", "*_{}*".format(self.experiment_name)
+        )
         exprs = glob.glob(model_path)
         if not exprs:
             return 0
@@ -476,7 +479,9 @@ class ExperimentOwl:
         score_sql = """SELECT mae 
                        FROM atmos_model_metadata
                        WHERE model_name = '{}'
-                       ORDER BY mae;""".format(self.experiment_name)
+                       ORDER BY mae;""".format(
+            self.experiment_name
+        )
         saved_score = engine.execute(score_sql).fetchone()
 
         if not saved_score or (metrics[0] < saved_score[0]):
@@ -486,28 +491,28 @@ class ExperimentOwl:
             if os.path.exists:
                 shutil.rmtree(winner_model)
             os.rename(exprs, winner_model)
-            
+
             m_buffer = zip_model(winner_model)
             encode_model = codecs.encode(pickle.dumps(m_buffer), "base64").decode()
 
-            engine.execute(INSERT_OR_UPDATE_MODEL.format(mn=self.experiment_name, 
-                                                         mf=encode_model))
             engine.execute(
-                INSERT_OR_UPDATE_SCORE.format(mn = self.experiment_name,
-                                              expr_id = self.experiment_id,
-                                              score1 = metrics[0],
-                                              score2 = metrics[1])
+                INSERT_OR_UPDATE_MODEL.format(mn=self.experiment_name, mf=encode_model)
+            )
+            engine.execute(
+                INSERT_OR_UPDATE_SCORE.format(
+                    mn=self.experiment_name,
+                    expr_id=self.experiment_id,
+                    score1=metrics[0],
+                    score2=metrics[1],
+                )
             )
             L.info("saved model %s %s" % (self.experiment_id, self.experiment_name))
-
 
     def modelfile_cleaner(self):
         """
         temp 폴더에 있는 모든 모델파일을 삭제합니다.
         가장 마지막에 실행하여 저장되고 남은 모델파일들을 삭제하는 용도로 사용할 수 있습니다.
         """
-        model_path = os.path.join(
-            self.experiment_path, "temp", "*"
-        )
+        model_path = os.path.join(self.experiment_path, "temp", "*")
         exprs = glob.glob(model_path)
         [shutil.rmtree(_) for _ in exprs]

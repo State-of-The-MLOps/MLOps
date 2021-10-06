@@ -55,7 +55,7 @@ async def predict_insurance(info: ModelCorePrediction, model_name: str):
 
     except Exception as e:
         L.error(e)
-        return {"error": str(e)}
+        return {"result": "Can't predict", "error": str(e)}
 
 
 @router.put("/atmos")
@@ -71,7 +71,7 @@ async def predict_temperature(time_series: List[float]):
     """
     if len(time_series) != 72:
         L.error(f"input time_series: {time_series} is not valid")
-        return "time series must have 72 values"
+        return {"result": "time series must have 72 values", "error": None}
 
     def sync_pred_ts(time_series):
         """
@@ -83,7 +83,7 @@ async def predict_temperature(time_series: List[float]):
             f"Predict Args info: {time_series.flatten().tolist()}\n\tmodel_name: {my_model.model_name}\n\tPrediction Result: {result.tolist()[0]}"
         )
 
-        return result
+        return {"result": result, "error": None}
 
     try:
         result = await run_in_threadpool(sync_pred_ts, time_series)
@@ -91,4 +91,4 @@ async def predict_temperature(time_series: List[float]):
 
     except Exception as e:
         L.error(e)
-        return {"error": str(e)}
+        return {"result": "Can't predict", "error": str(e)}
