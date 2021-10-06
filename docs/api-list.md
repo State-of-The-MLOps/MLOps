@@ -23,8 +23,6 @@ PUT {{API_URL}}/train/insurance
 
 | 파라미터        | 파라미터 유형 | 데이터 타입 | 필수 여부 | 설명                    |
 | --------------- | ------------- | ----------- | --------- | ----------------------- |
-| `PORT`      | `body`        | `int`    | `(default) 8080`        | NNi 포트번호      |
-| `experiment_sec`      | `body`        | `int`   | `(default) 20`        | 학습시간(초)            |
 | `experiment_name`      | `body`        | `str`    | `(default) exp1`        | 학습이름    |
 | `experimenter` | `body`        | `str`    | `(default) DongUk`        | 연구자 이름 |
 | `model_name`      | `body`        | `str`    | `(default) insurance_fee_model`        | 학습 모델 이름                    |
@@ -37,15 +35,13 @@ PUT {{API_URL}}/train/insurance
 
 | 키             | 데이터 타입 | 설명          |
 | -------------- | ----------- | ------------- |
-| `msg`  | `string`    | NNi실험을 확인할 수 있는 링크주소    |
+| `msg`  | `string`    | NNI Dashboard 정보    |
 | `error`  | `string`    | 에러내용    |
 
 
 ```jsonc
 {
-  "result": 'Check out {{API_URL}}:{PORT}',
-}
-{
+  "msg": Info Message,
   "error": "Error info"
 }
 ```
@@ -66,10 +62,13 @@ PUT {{API_URL}}/train/insurance
 
 | 키             | 데이터 타입 | 설명          |
 | -------------- | ----------- | ------------- |
+| `msg`  | `string`    | NNI Dashboard 정보    |
 | `error`  | `string`    | 에러내용    |
+
 
 ```jsonc
 {
+  "msg": Info Message,
   "error": "Error info"
 }
 ```
@@ -106,8 +105,6 @@ PUT {{API_URL}}/predict/insurance
 ```jsonc
 {
   "result": 3213.123,
-}
-{
   "error": "Error info"
 }
 ```
@@ -132,15 +129,13 @@ PUT {{API_URL}}/predict/atmos
 
 | 키             | 데이터 타입 | 설명          |
 | -------------- | ----------- | ------------- |
-| x  | `List[float]`    | 예측된 향후 24일간 온도값    |
+| `result`  | `List[float]`    | 예측된 향후 24일간 온도값    |
 | `error`  | `string`    | 에러내용    |
 
 
 ```jsonc
 {
-  [32.32, 33.32, 34.11...]
-}
-{
+  "result": [32.32, 33.32, 34.11...],
   "error": "Error info"
 }
 ```
