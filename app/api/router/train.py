@@ -98,7 +98,7 @@ def train_atmos(expr_name: str):
             m_process.start()
 
             L.info(nni_create_result)
-            return nni_create_result
+            return {"msg": nni_create_result, "error": None}
 
         else:
             L.error(nni_create_result)
