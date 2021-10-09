@@ -83,11 +83,11 @@ async def predict_temperature(time_series: List[float]):
             f"Predict Args info: {time_series.flatten().tolist()}\n\tmodel_name: {my_model.model_name}\n\tPrediction Result: {result.tolist()[0]}"
         )
 
-        return {"result": result, "error": None}
+        return {"result": result.tolist(), "error": None}
 
     try:
         result = await run_in_threadpool(sync_pred_ts, time_series)
-        return result.tolist()
+        return result
 
     except Exception as e:
         L.error(e)
