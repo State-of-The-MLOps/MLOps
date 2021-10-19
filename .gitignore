@@ -4,3 +4,4 @@ __pycache__
 tf_model/**/*
 log.txt
 experiments/**/temp/
+.ssl/

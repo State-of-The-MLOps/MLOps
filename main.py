@@ -27,6 +27,11 @@ def hello_world():
 
 
 if __name__ == "__main__":
-    uvicorn.run(
-        "main:app", host="0.0.0.0", port=8000, reload=True, reload_dirs=["app/"]
-    )
+    uvicorn.run("main:app",
+                host="0.0.0.0",
+                port=8000,
+                reload=True,
+                ssl_keyfile=".ssl/private.key",
+                ssl_certfile=".ssl/certificate.crt",
+                ssl_ca_certs=".ssl/ca_bundle.crt",
+                reload_dirs=["app/"])
