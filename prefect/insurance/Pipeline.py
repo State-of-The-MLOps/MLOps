@@ -1,6 +1,6 @@
 from mlflow.entities import experiment
 from prefect.schedules.schedules import CronSchedule
-from task import etl, train_mlflow_ray
+from task import etl, log_best_model, train_mlflow_ray
 
 import prefect
 from prefect import Flow, Parameter
@@ -42,10 +42,17 @@ class Pipeline:
             host_url = Parameter("host_url", "http://localhost:5001")
             exp_name = Parameter("exp_name", "insurance")
             metric = Parameter("metric", "mae")
+            model_type = Parameter("model_type", "xgboost")
+            num_trials = Parameter("num_trials", 10)
 
             X, y = etl(extract_query)
 
-            train_mlflow_ray(X, y, host_url, exp_name, metric)
+            is_end = train_mlflow_ray(
+                X, y, host_url, exp_name, metric, num_trials
+            )
+
+            if is_end:
+                log_best_model(is_end, host_url, exp_name, metric, model_type)
 
         self._flow = flow
         self._register()

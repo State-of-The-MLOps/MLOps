@@ -6,6 +6,7 @@ import pandas as pd
 import xgboost as xgb
 from db import engine
 from mlflow.tracking import MlflowClient
+from query import INSERT_BEST_MODEL, SELECT_EXIST_MODEL, UPDATE_BEST_MODEL
 from ray import tune
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
@@ -132,7 +133,7 @@ class InsuranceTuner(Tuner):
         self._log_experiments(config, metrics, xgb_model)
         tune.report(**metrics)
 
-    def exec(self, tune_config=None, num_trials=10):
+    def exec(self, tune_config=None, num_trials=1):
         DEFAULT_CONFIG = {
             "objective": "reg:squarederror",
             "eval_metric": ["mae", "rmse"],
@@ -152,6 +153,29 @@ class InsuranceTuner(Tuner):
         )
 
 
+def save_best_model(
+    artifact_uri, model_type, metric, metric_score, model_name
+):
+
+    exist_model = engine.execute(
+        SELECT_EXIST_MODEL.format(model_name)
+    ).fetchone()
+
+    # 업데이트
+    if exist_model and exist_model.metric_score >= metric_score:
+        engine.execute(
+            UPDATE_BEST_MODEL.format(
+                artifact_uri, model_type, metric, metric_score, model_name
+            )
+        )
+    else:  # 생성
+        engine.execute(
+            INSERT_BEST_MODEL.format(
+                model_name, artifact_uri, model_type, metric, metric_score
+            )
+        )
+
+
 @task(nout=2)
 def etl(query):
     etl = ETL(query)
@@ -165,19 +189,36 @@ def etl(query):
 
 
 @task
-def train_mlflow_ray(X, y, host_url, exp_name, metric):
+def train_mlflow_ray(X, y, host_url, exp_name, metric, num_trials):
     mlflow.set_tracking_uri(host_url)
     mlflow.set_experiment(exp_name)
 
     it = InsuranceTuner(
         data_X=X, data_y=y, host_url=host_url, exp_name=exp_name, metric=metric
     )
-    it.exec()
+    it.exec(num_trials=num_trials)
+
+    return True
 
 
 @task
-def log_best_model():
-    pass
+def log_best_model(is_end, host_url, exp_name, metric, model_type):
+    mlflow.set_tracking_uri(host_url)
+
+    client = MlflowClient()
+    exp_id = client.get_experiment_by_name(exp_name).experiment_id
+    runs = mlflow.search_runs([exp_id])
+
+    best_score = runs["metrics.mae"].min()
+    best_run = runs[runs["metrics.mae"] == best_score]
+
+    save_best_model(
+        best_run["artifact_uri"].item(),
+        model_type,
+        metric,
+        metric_score=best_score,
+        model_name=exp_name,
+    )
 
 
 # if __name__ == '__main__':
@@ -185,5 +226,9 @@ def log_best_model():
 #     host_url =  'http://localhost:5001'
 #     exp_name =  'insurance'
 #     metric =  'mae'
+#     model_type = 'xgboost'
 #     X, y = etl(extract_query)
-#     train_mlflow_ray(X, y, host_url, exp_name, metric)
+#     is_end = train_mlflow_ray(X, y, host_url, exp_name, metric)
+
+#     if is_end:
+#         log_best_model(is_end, host_url, exp_name, metric, model_type)
