@@ -4,5 +4,5 @@ from prefect import Client
 
 if __name__ == '__main__':
     Client().create_project(project_name='atmos_test')
-    Pipeline = atmos_ETL("atmos_test", "test_flow", "0 5 * * *")
+    Pipeline = atmos_ETL("atmos_test", "test_flow", "* * * * *")
     Pipeline.create_flow()
