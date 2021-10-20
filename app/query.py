@@ -102,7 +102,7 @@ WHERE NOT EXISTS (SELECT 1
 """
 
 SELECT_BEST_MODEL = """
-    SELECT artifact_uri, model_type
+    SELECT artifact_uri
     FROM best_model_data
     WHERE model_name = '{}'
 """
