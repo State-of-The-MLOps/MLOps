@@ -5,3 +5,5 @@ tf_model/**/*
 log.txt
 experiments/**/temp/
 .ssl/
+prefect/atmos_tmp_pipeline/ray_mlflow
+prefect/atmos_tmp_pipeline/start_mlflow.sh

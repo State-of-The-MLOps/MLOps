@@ -25,14 +25,25 @@ class atmos_ETL:
 
         with Flow(self._flow_name) as flow:
             self._logger.info('start data extract')
+            
+            host_url = os.getenv('MLFLOW_HOST')
+            exp_name = "atmos_tmp"
+            metric = "mae"
+            model_type = "tensorflow"
+            num_trials = 10
+
             extr_result = data_extract(os.getenv('ATMOS_API_KEY'))
-            
             valid_result = data_validation(extr_result[1])
-            
-            data_load_to_db(valid_result[1],
+            load_data = data_load_to_db(valid_result[1],
                             os.getenv("POSTGRES_USER"),
                             os.getenv("POSTGRES_SERVER"),
                             os.getenv("POSTGRES_PASSWORD"))
+            is_end = train_mlflow_ray(load_data,
+                                      host_url,                                      
+                                      exp_name,
+                                      metric,
+                                      num_trials)
+            log_best_model(is_end, host_url, exp_name, metric, model_type)
 
         self._flow = flow
         self._register()

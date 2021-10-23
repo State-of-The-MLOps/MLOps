@@ -1,7 +1,6 @@
 import requests
-import json
 import os
-from dotenv import load_dotenv
+from utils import *
 import sqlalchemy
 import pandas as pd
 from datetime import timedelta
@@ -9,48 +8,16 @@ import tensorflow_data_validation as tfdv
 import prefect
 from prefect import task
 from prefect.tasks.prefect.flow_run_cancel import CancelFlowRun
-
-def connect(db):
-    """Returns a connection and a metadata object"""
-
-    load_dotenv(verbose=True)
-
-    POSTGRES_USER = os.getenv("POSTGRES_USER")
-    POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
-    POSTGRES_SERVER = os.getenv("POSTGRES_SERVER")
-    POSTGRES_PORT = os.getenv("POSTGRES_PORT")
-    POSTGRES_DB = db
-
-    url = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_SERVER}:{POSTGRES_PORT}/{POSTGRES_DB}"
-
-    connection = sqlalchemy.create_engine(url)
-
-    return connection
-
-conn = connect('postgres')
-
-def load_to_db(data):
-    data.to_sql("atmos_stn108", conn, index=False, if_exists='append')
-
-def get_st_date():
-    start_date = conn.execute(
-            "SELECT time FROM atmos_stn108 ORDER BY time DESC;"
-            ).fetchone()[0]
-    return start_date
-
-def get_org_data(start_date):
-    org_data_query = f"""
-    SELECT *
-    FROM atmos_stn108
-    WHERE time < '{start_date}';
-    """
-    org_data = pd.read_sql(org_data_query, conn)
-    return org_data
-
+import mlflow
 
 @task
 def data_extract(api_key):
     logger = prefect.context.get("logger")
+
+    timenow = pd.Timestamp.utcnow()\
+              .tz_convert("Asia/Seoul")\
+              .strftime("%Y-%m-%d %H:%M")
+    logger.info(f"{timenow}(KST): start data ETL process")
 
     start_date = get_st_date()
     start_date = pd.to_datetime(start_date) + timedelta(hours=1)
@@ -65,39 +32,44 @@ def data_extract(api_key):
         logger.info(up_to_date)
         CFR = CancelFlowRun()
         CFR.run()
-        return False, up_to_date
+        return False
 
     date_range = [start_date,
                  *pd.date_range(stt_date_str, 
                                 end_date_str)[1:]]
-    logger.warning(date_range)
+    logger.info(date_range)
 
-    flag = 1
     atmos_data = []
     for dr in date_range:
-
         req_url = (f"{endpoint}?serviceKey={api_key}"
                    f"&numOfRows=24&dataType=JSON&dataCd=ASOS&dateCd=HR"
                    f"&startDt={dr.strftime('%Y%m%d')}&startHh={dr.hour:>02}"
                    f"&endDt={dr.strftime('%Y%m%d')}&endHh=23&stnIds=108")
         
         resp = requests.get(req_url)
-        logger.info(resp)
+        logger.info(f"{resp}: {dr}")
 
         if not resp.ok:
-            json_file = json.loads(resp.text)
             logger.error(f"status code: {resp.status_code}")
-            logger.error(json_file)
+            logger.error(f"request error: {resp.text}")
+            break
 
-        json_file = json.loads(resp.text)
-        if flag == 1:
-            logger.info(json_file)
-            flag -= 1
-
-        json_data = json_file['response']['body']['items']['item']
+        try:
+            json_file = resp.json()
+            json_data = json_file['response']['body']['items']['item']
+        except Exception as e:
+            logger.info(f"response text: {resp.text}")
+            logger.error(e)
+            break
 
         raw_data = list(map(lambda x: x.values(), json_data))
         atmos_data.extend(raw_data)
+    
+    if not atmos_data:
+        logger.error("failed to request data")
+        CFR = CancelFlowRun()
+        CFR.run()
+        return False
     
     atmos_df = pd.DataFrame(atmos_data,
                             columns = json_data[0].keys())
@@ -147,6 +119,7 @@ def data_validation(new_data):
         logger.info(drift_stats)
         CFR = CancelFlowRun()
         CFR.run()
+        return False
 
 
 @task
@@ -154,5 +127,52 @@ def data_load_to_db(new_data, ps_user, ps_host, ps_pw):
     logger = prefect.context.get("logger")
     logger.info((f"data type: {type(new_data)}\n\r"
                  f"data shape: {new_data.shape}"))
-    load_to_db(new_data)
-    logger.info("data has been saved successfully!")
+    try:
+        load_to_db(new_data)
+        logger.info("data has been saved successfully!")
+        return True
+    except Exception as e:
+        logger.error(e)
+        CFR = CancelFlowRun()
+        CFR.run()
+        return False
+
+
+@task
+def train_mlflow_ray(load_data_suc, host_url, exp_name, metric, num_trials):
+    mlflow.set_tracking_uri(host_url)
+    mlflow.set_experiment(exp_name)
+
+    it = AtmosTuner(
+        host_url=host_url, exp_name=exp_name, metric=metric
+    )
+    it.exec(num_trials=num_trials)
+
+    return True
+
+
+@task
+def log_best_model(is_end, host_url, exp_name, metric, model_type):
+    mlflow.set_tracking_uri(host_url)
+
+    client = MlflowClient()
+    exp_id = client.get_experiment_by_name(exp_name).experiment_id
+    runs = mlflow.search_runs([exp_id])
+
+    best_score = runs["metrics.mae"].min()
+    best_run = runs[runs["metrics.mae"] == best_score]
+    run_data = mlflow.get_run(best_run.run_id.item()).data
+    history = eval(run_data.tags["mlflow.log-model.history"])
+
+    artifact_uri = best_run["artifact_uri"].item()
+    artifact_path = history[0]["artifact_path"]
+
+    artifact_uri = artifact_uri + f"/{artifact_path}"
+
+    save_best_model(
+        artifact_uri,
+        model_type,
+        metric,
+        metric_score=best_score,
+        model_name=exp_name,
+    )
