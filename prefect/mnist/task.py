@@ -20,7 +20,13 @@ from sklearn.neighbors import KNeighborsClassifier
 from torch.utils.data import DataLoader, Dataset, random_split
 
 from prefect import task
+from sqlalchemy import create_engine
 
+from query import SELECT_EXIST_MODEL, INSERT_BEST_MODEL, UPDATE_BEST_MODEL
+
+engine = create_engine(
+    "postgresql://ehddnr:0000@localhost:5431/postgres"
+)
 
 class MnistDataset(Dataset):
     def __init__(self, data, transform=None):
@@ -178,6 +184,7 @@ def cnn_training(config, checkpoint_dir=None, data_path=None):
         tune.report(loss=(val_loss / val_steps), accuracy=correct / total)
 
 
+@task
 def tune_cnn(num_samples, max_num_epochs, data_path):
     config = {
         "l1": tune.sample_from(lambda _: 2 ** np.random.randint(7, 9)),
@@ -203,24 +210,33 @@ def tune_cnn(num_samples, max_num_epochs, data_path):
 
     return result
 
+def save_best_model(model_name, run_id, model_type, metric, metric_score):
+    exist_model = engine.execute(
+        SELECT_EXIST_MODEL.format(model_name)
+    ).fetchone()
 
-def log_experiment(results, host_url, exp_name):
+    if exist_model and exist_model.metric_score >= metric_score:
+        engine.execute(
+            UPDATE_BEST_MODEL.format(
+                run_id, model_type, metric, metric_score, model_name
+            )
+        )
+    else:  # 생성
+        engine.execute(
+            INSERT_BEST_MODEL.format(
+                model_name, run_id, model_type, metric, metric_score
+            )
+        )
+
+
+
+@task
+def log_experiment(results, host_url, exp_name, metric):
     mlflow.set_tracking_uri(host_url)
     client = MlflowClient()
     exp_id = client.get_experiment_by_name(exp_name).experiment_id
 
     best_trial = results.get_best_trial("loss", "min", "last")
-    print("Best trial config: {}".format(best_trial.config))
-    print(
-        "Best trial final validation loss: {}".format(
-            best_trial.last_result["loss"]
-        )
-    )
-    print(
-        "Best trial final validation accuracy: {}".format(
-            best_trial.last_result["accuracy"]
-        )
-    )
     metrics = {
         "loss": best_trial.last_result["loss"],
         "accuracy": best_trial.last_result["accuracy"],
@@ -231,7 +247,6 @@ def log_experiment(results, host_url, exp_name):
         "batch_size": best_trial.config["batch_size"],
     }
     best_trained_model = MnistNet(configs["l1"])
-    device = "cpu"
 
     best_checkpoint_dir = best_trial.checkpoint.value
     model_state, optimizer_state = torch.load(
@@ -239,27 +254,32 @@ def log_experiment(results, host_url, exp_name):
     )
     best_trained_model.load_state_dict(model_state)
 
-    with mlflow.start_run(experiment_id=exp_id):
-        mlflow.log_metrics(metrics)
-        mlflow.log_params(configs)
-        mlflow.pytorch.log_model(best_trained_model, artifact_path="model")
+    runs = mlflow.search_runs([exp_id])
+    best_score = runs[f"metrics.{metric}"].min()
+    best_run = runs[runs[f'metrics.{metric}'] == best_score]
+
+    if not best_score or best_score > metrics[metric]:
+        with mlflow.start_run(experiment_id=exp_id):
+            mlflow.log_metrics(metrics)
+            mlflow.log_params(configs)
+            mlflow.pytorch.log_model(best_trained_model, artifact_path="model")
+            save_best_model(exp_name, best_run.run_id.item(), 'pytorch', metric, metrics[metric])
 
 
-if __name__ == "__main__":
-    data_path = "/Users/TFG5076XG/Documents/MLOps/prefect/mnist/mnist.csv"
-    host_url = "http://localhost:5001"
-    exp_name = "mnist"
-    batch_size = 64
-    learning_rate = 1e-3
-    device = "cpu"
-    l1 = 128
-    num_samples = 1
-    max_num_epochs = 1
+# if __name__ == "__main__":
+#     data_path = "/Users/don/Documents/MLOps/prefect/mnist/mnist.csv"
+#     host_url = "http://localhost:5001"
+#     exp_name = "mnist"
+#     batch_size = 64
+#     learning_rate = 1e-3
+#     device = "cpu"
+#     l1 = 128
+#     num_samples = 2
+#     max_num_epochs = 1
+#     metric = 'loss'
 
-    mlflow.set_tracking_uri(host_url)
-    mlflow.set_experiment(exp_name)
+#     mlflow.set_tracking_uri(host_url)
+#     mlflow.set_experiment(exp_name)
 
-    # train_df, valid_df = load_data(data_path)
-    # train_loader, valid_loader, total_batch = preprocess_train(train_df, valid_df, batch_size)
-    results = tune_cnn(num_samples, max_num_epochs, data_path)
-    log_experiment(results, host_url, exp_name)
+#     results = tune_cnn(num_samples, max_num_epochs, data_path)
+#     log_experiment(results, host_url, exp_name, metric)

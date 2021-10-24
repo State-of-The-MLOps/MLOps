@@ -65,7 +65,7 @@ class BestModelData(Base):
     __tablename__ = "best_model_data"
 
     model_name = Column(String, primary_key=True)
-    artifact_uri = Column(String, nullable=False)
+    run_id = Column(String, nullable=False)
     model_type = Column(String, nullable=False)
     metric = Column(String, nullable=False)
     metric_score = Column(Float, nullable=False)

@@ -4,6 +4,8 @@ from prefect.schedules.schedules import CronSchedule
 import prefect
 from prefect import Flow, Parameter
 
+from task import log_experiment, tune_cnn
+
 
 class Pipeline:
     _project_name = None
@@ -37,16 +39,14 @@ class Pipeline:
             """
 
             host_url = Parameter("host_url", "http://localhost:5001")
-            data_path = Parameter("C:\Users\TFG5076XG\Documents\MLOps\prefect\mnist\mnist.csv")
+            data_path = Parameter('data_path',  "/Users/don/Documents/MLOps/prefect/mnist/mnist.csv")
             exp_name = Parameter("exp_name", "mnist")
-            model_type = Parameter("model_type", "pytorch")
-            device = Parameter('device', 'cpu')
-            l1 = Parameter('l1', 128)
-            epochs = Parameter('epochs', 10)
-            batch_size = Parameter('batch_size', 64)
+            metric = Parameter('metric', 'loss')
             num_samples = Parameter('num_samples', 10)
             max_num_epochs = Parameter('max_num_epochs', 10)
 
+            results = tune_cnn(num_samples, max_num_epochs, data_path)
+            log_experiment(results, host_url, exp_name, metric)
             
 
         self._flow = flow
