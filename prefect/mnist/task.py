@@ -85,7 +85,7 @@ def load_data(data_path):
     trainset = MnistDataset(train_df, transform)
     validset = MnistDataset(valid_df, transform)
 
-    return trainset, validset
+    return trainset, validset, train_df
 
 
 def preprocess_train(train_df, valid_df, batch_size):
@@ -121,12 +121,12 @@ def cnn_training(config, checkpoint_dir=None, data_path=None):
         Net.load_state_dict(model_state)
         optimizer.load_state_dict(optimizer_state)
 
-    trainset, validset = load_data(data_path)
+    trainset, validset, train_df = load_data(data_path)
 
-    test_abs = int(len(trainset) * 0.8)
-    train_subset, val_subset = random_split(
-        trainset, [test_abs, len(trainset) - test_abs]
-    )
+    # test_abs = int(len(trainset) * 0.8)
+    # train_subset, val_subset = random_split(
+    #     trainset, [test_abs, len(trainset) - test_abs]
+    # )
 
     train_loader = DataLoader(trainset, batch_size=int(config["batch_size"]))
     valid_loader = DataLoader(validset, batch_size=int(config["batch_size"]))
@@ -181,11 +181,13 @@ def cnn_training(config, checkpoint_dir=None, data_path=None):
             path = os.path.join(checkpoint_dir, "checkpoint")
             torch.save((Net.state_dict(), optimizer.state_dict()), path)
 
-        tune.report(loss=(val_loss / val_steps), accuracy=correct / total)
+        tune.report(loss=(val_loss / val_steps), accuracy=correct / total, train_df=train_df)
 
 
-@task
+# @task
 def tune_cnn(num_samples, max_num_epochs, data_path):
+    mlflow.set_tracking_uri(host_url)
+    mlflow.set_experiment(exp_name)
     config = {
         "l1": tune.sample_from(lambda _: 2 ** np.random.randint(7, 9)),
         "lr": tune.loguniform(1e-4, 1e-1),
@@ -207,10 +209,18 @@ def tune_cnn(num_samples, max_num_epochs, data_path):
         num_samples=num_samples,
         scheduler=scheduler,
     )
-
+    
     return result
 
-def save_best_model(model_name, run_id, model_type, metric, metric_score):
+def save_best_model(model_name, model_type, metric, metric_score):
+    client = MlflowClient()
+    exp = client.get_experiment_by_name(exp_name)
+    exp_id = exp.experiment_id
+    runs = mlflow.search_runs([exp_id])
+    best_score = runs[f"metrics.{metric}"].min()
+    best_run = runs[runs[f'metrics.{metric}'] == best_score]
+    run_id = best_run.run_id.item()
+
     exist_model = engine.execute(
         SELECT_EXIST_MODEL.format(model_name)
     ).fetchone()
@@ -230,12 +240,13 @@ def save_best_model(model_name, run_id, model_type, metric, metric_score):
 
 
 
-@task
+# @task
 def log_experiment(results, host_url, exp_name, metric):
     mlflow.set_tracking_uri(host_url)
+    mlflow.set_experiment(exp_name)
     client = MlflowClient()
-    exp_id = client.get_experiment_by_name(exp_name).experiment_id
-
+    exp = client.get_experiment_by_name(exp_name)
+    
     best_trial = results.get_best_trial("loss", "min", "last")
     metrics = {
         "loss": best_trial.last_result["loss"],
@@ -246,40 +257,75 @@ def log_experiment(results, host_url, exp_name, metric):
         "lr": best_trial.config["lr"],
         "batch_size": best_trial.config["batch_size"],
     }
-    best_trained_model = MnistNet(configs["l1"])
 
+    best_trained_model = MnistNet(configs["l1"])
     best_checkpoint_dir = best_trial.checkpoint.value
     model_state, optimizer_state = torch.load(
         os.path.join(best_checkpoint_dir, "checkpoint")
     )
     best_trained_model.load_state_dict(model_state)
-
+    exp_id = exp.experiment_id
     runs = mlflow.search_runs([exp_id])
-    best_score = runs[f"metrics.{metric}"].min()
-    best_run = runs[runs[f'metrics.{metric}'] == best_score]
-
-    if not best_score or best_score > metrics[metric]:
+    if runs.empty:
         with mlflow.start_run(experiment_id=exp_id):
             mlflow.log_metrics(metrics)
             mlflow.log_params(configs)
             mlflow.pytorch.log_model(best_trained_model, artifact_path="model")
-            save_best_model(exp_name, best_run.run_id.item(), 'pytorch', metric, metrics[metric])
+            save_best_model(exp_name, 'pytorch', metric, metrics[metric])
+    else:
+        best_score = runs[f"metrics.{metric}"].min()
 
+        if best_score > metrics[metric]:
+            with mlflow.start_run(experiment_id=exp_id):
+                mlflow.log_metrics(metrics)
+                mlflow.log_params(configs)
+                mlflow.pytorch.log_model(best_trained_model, artifact_path="model")
+                save_best_model(exp_name, 'pytorch', metric, metrics[metric])
+            return True
+        else:
+            return False
 
-# if __name__ == "__main__":
-#     data_path = "/Users/don/Documents/MLOps/prefect/mnist/mnist.csv"
-#     host_url = "http://localhost:5001"
-#     exp_name = "mnist"
-#     batch_size = 64
-#     learning_rate = 1e-3
-#     device = "cpu"
-#     l1 = 128
-#     num_samples = 2
-#     max_num_epochs = 1
-#     metric = 'loss'
+def make_feature_weight(results):
+    last_result = results.get_best_trial("loss", "min", "last")
+    train_df = last_result.last_result['train_df']
 
-#     mlflow.set_tracking_uri(host_url)
-#     mlflow.set_experiment(exp_name)
+# @task
+def case1():
+    print('hihihihihihi')
+# @task
+def case2():
+    print('lwlwlwlwlwlwlw')
 
-#     results = tune_cnn(num_samples, max_num_epochs, data_path)
-#     log_experiment(results, host_url, exp_name, metric)
+# def test(results):
+#     aa = results.get_best_trial("loss", "min", "last")
+#     print(dir(aa))
+#     print(aa.trial_id)
+
+if __name__ == "__main__":
+    data_path = "/Users/don/Documents/MLOps/prefect/mnist/mnist.csv"
+    host_url = "http://localhost:5001"
+    exp_name = "mnist"
+    batch_size = 64
+    learning_rate = 1e-3
+    device = "cpu"
+    l1 = 128
+    num_samples = 1
+    max_num_epochs = 1
+    metric = 'loss'
+
+    mlflow.set_tracking_uri(host_url)
+    mlflow.set_experiment(exp_name)
+
+    results = tune_cnn(num_samples, max_num_epochs, data_path)
+    # test(results)
+    is_end = log_experiment(results, host_url, exp_name, metric)
+    print(is_end)
+    
+    # make_feature_weight(results)
+
+    # if is_end:
+    #     print('True')
+    # else:
+    #     print('False')
+        
+

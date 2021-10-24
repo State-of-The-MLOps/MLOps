@@ -2,7 +2,9 @@
 from prefect.schedules.schedules import CronSchedule
 
 import prefect
-from prefect import Flow, Parameter
+from prefect import Flow, Parameter, case
+from task import case1, case2
+
 
 from task import log_experiment, tune_cnn
 
@@ -46,7 +48,15 @@ class Pipeline:
             max_num_epochs = Parameter('max_num_epochs', 10)
 
             results = tune_cnn(num_samples, max_num_epochs, data_path)
-            log_experiment(results, host_url, exp_name, metric)
+            is_end = log_experiment(results, host_url, exp_name, metric)
+            
+            with case(is_end, True):
+                case1()
+                
+            with case(is_end, False):
+                case2()
+            
+
             
 
         self._flow = flow
