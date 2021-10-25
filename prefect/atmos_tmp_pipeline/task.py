@@ -161,16 +161,10 @@ def log_best_model(is_end, host_url, exp_name, metric, model_type):
 
     best_score = runs["metrics.mae"].min()
     best_run = runs[runs["metrics.mae"] == best_score]
-    run_data = mlflow.get_run(best_run.run_id.item()).data
-    history = eval(run_data.tags["mlflow.log-model.history"])
-
-    artifact_uri = best_run["artifact_uri"].item()
-    artifact_path = history[0]["artifact_path"]
-
-    artifact_uri = artifact_uri + f"/{artifact_path}"
+    run_id = best_run.run_id.item()
 
     save_best_model(
-        artifact_uri,
+        run_id,
         model_type,
         metric,
         metric_score=best_score,

@@ -12,7 +12,7 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.layers import GRU
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from ray import tune
@@ -253,7 +253,7 @@ class AtmosTuner(Tuner):
         )
 
 def save_best_model(
-    artifact_uri, model_type, metric, metric_score, model_name
+    run_id, model_type, metric, metric_score, model_name
 ):
 
     exist_model = conn.execute(
@@ -264,12 +264,12 @@ def save_best_model(
     if exist_model and exist_model.metric_score >= metric_score:
         conn.execute(
             UPDATE_BEST_MODEL.format(
-                artifact_uri, model_type, metric, metric_score, model_name
+                run_id, model_type, metric, metric_score, model_name
             )
         )
     else:  # 생성
         conn.execute(
             INSERT_BEST_MODEL.format(
-                model_name, artifact_uri, model_type, metric, metric_score
+                model_name, run_id, model_type, metric, metric_score
             )
         )
