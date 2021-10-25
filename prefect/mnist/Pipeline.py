@@ -1,12 +1,14 @@
-
 from prefect.schedules.schedules import CronSchedule
+from task import (
+    case2,
+    log_experiment,
+    make_feature_weight,
+    train_knn,
+    tune_cnn,
+)
 
 import prefect
 from prefect import Flow, Parameter, case
-from task import case1, case2
-
-
-from task import log_experiment, tune_cnn
 
 
 class Pipeline:
@@ -41,23 +43,20 @@ class Pipeline:
             """
 
             host_url = Parameter("host_url", "http://localhost:5001")
-            data_path = Parameter('data_path',  "/Users/don/Documents/MLOps/prefect/mnist/mnist.csv")
             exp_name = Parameter("exp_name", "mnist")
-            metric = Parameter('metric', 'loss')
-            num_samples = Parameter('num_samples', 10)
-            max_num_epochs = Parameter('max_num_epochs', 10)
+            metric = Parameter("metric", "loss")
+            num_samples = Parameter("num_samples", 1)
+            max_num_epochs = Parameter("max_num_epochs", 1)
 
-            results = tune_cnn(num_samples, max_num_epochs, data_path)
+            results = tune_cnn(num_samples, max_num_epochs)
             is_end = log_experiment(results, host_url, exp_name, metric)
-            
+
             with case(is_end, True):
-                case1()
-                
+                feature_weight_df = make_feature_weight(results, "cpu")
+                train_knn(feature_weight_df, metric, exp_name, results)
+
             with case(is_end, False):
                 case2()
-            
-
-            
 
         self._flow = flow
         self._register()

@@ -1,4 +1,5 @@
 import os
+import time
 from abc import *
 from functools import partial
 
@@ -12,21 +13,19 @@ import torch.optim as optim
 import torchvision
 import torchvision.transforms as transforms
 from mlflow.tracking import MlflowClient
+from query import INSERT_BEST_MODEL, SELECT_EXIST_MODEL, UPDATE_BEST_MODEL
 from ray import tune
 from ray.tune import CLIReporter
 from ray.tune.schedulers import ASHAScheduler
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
+from sqlalchemy import create_engine
 from torch.utils.data import DataLoader, Dataset, random_split
 
 from prefect import task
-from sqlalchemy import create_engine
 
-from query import SELECT_EXIST_MODEL, INSERT_BEST_MODEL, UPDATE_BEST_MODEL
+engine = create_engine("postgresql://ehddnr:0000@localhost:5431/postgres")
 
-engine = create_engine(
-    "postgresql://ehddnr:0000@localhost:5431/postgres"
-)
 
 class MnistDataset(Dataset):
     def __init__(self, data, transform=None):
@@ -63,24 +62,29 @@ class MnistNet(torch.nn.Module):
         )
         self.flatten = torch.nn.Flatten()
         self.fc = torch.nn.Linear(7 * 7 * 64, l1, bias=True)
-        self.last_layer = torch.nn.Linear(l1, 10, bias=True)
+        self.fc2 = torch.nn.Linear(l1, 32, bias=True)
+        self.last_layer = torch.nn.Linear(32, 10, bias=True)
 
     def forward(self, x):
         out = self.layer1(x)
         out = self.layer2(out)
         out = self.flatten(out)
         out = self.fc(out)
+        out = self.fc2(out)
         out = self.last_layer(out)
         return out
 
 
-def load_data(data_path):
+def load_data():
     transform = transforms.Compose(
         [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
     )
-    df = pd.read_csv(data_path)
-    train_df, valid_df = train_test_split(
-        df, test_size=0.1, stratify=df["label"]
+
+    train_df = pd.read_csv(
+        "/Users/TFG5076XG/Documents/MLOps/prefect/mnist/mnist_train.csv"
+    )
+    valid_df = pd.read_csv(
+        "/Users/TFG5076XG/Documents/MLOps/prefect/mnist/mnist_valid.csv"
     )
     trainset = MnistDataset(train_df, transform)
     validset = MnistDataset(valid_df, transform)
@@ -101,7 +105,7 @@ def preprocess_train(train_df, valid_df, batch_size):
     return (train_loader, valid_loader, total_batch)
 
 
-def cnn_training(config, checkpoint_dir=None, data_path=None):
+def cnn_training(config, checkpoint_dir=None):
     Net = MnistNet(config["l1"])
     device = "cpu"
 
@@ -121,7 +125,7 @@ def cnn_training(config, checkpoint_dir=None, data_path=None):
         Net.load_state_dict(model_state)
         optimizer.load_state_dict(optimizer_state)
 
-    trainset, validset, train_df = load_data(data_path)
+    trainset, validset, train_df = load_data()
 
     # test_abs = int(len(trainset) * 0.8)
     # train_subset, val_subset = random_split(
@@ -181,13 +185,12 @@ def cnn_training(config, checkpoint_dir=None, data_path=None):
             path = os.path.join(checkpoint_dir, "checkpoint")
             torch.save((Net.state_dict(), optimizer.state_dict()), path)
 
-        tune.report(loss=(val_loss / val_steps), accuracy=correct / total, train_df=train_df)
+        tune.report(loss=(val_loss / val_steps), accuracy=correct / total)
 
 
-# @task
-def tune_cnn(num_samples, max_num_epochs, data_path):
-    mlflow.set_tracking_uri(host_url)
-    mlflow.set_experiment(exp_name)
+@task
+def tune_cnn(num_samples, max_num_epochs):
+
     config = {
         "l1": tune.sample_from(lambda _: 2 ** np.random.randint(7, 9)),
         "lr": tune.loguniform(1e-4, 1e-1),
@@ -203,23 +206,34 @@ def tune_cnn(num_samples, max_num_epochs, data_path):
     )
 
     result = tune.run(
-        partial(cnn_training, data_path=data_path),
+        partial(cnn_training),
         resources_per_trial={"cpu": 2},
         config=config,
         num_samples=num_samples,
         scheduler=scheduler,
     )
-    
+
     return result
 
-def save_best_model(model_name, model_type, metric, metric_score):
+
+def save_best_model(
+    model_name, model_type, metric, metric_score, exp_name, is_knn=False
+):
     client = MlflowClient()
     exp = client.get_experiment_by_name(exp_name)
     exp_id = exp.experiment_id
     runs = mlflow.search_runs([exp_id])
     best_score = runs[f"metrics.{metric}"].min()
-    best_run = runs[runs[f'metrics.{metric}'] == best_score]
+    best_run = runs[runs[f"metrics.{metric}"] == best_score]
     run_id = best_run.run_id.item()
+    if is_knn:
+        recent_knn = (
+            runs[~runs["params.time"].isna()]["params.time"]
+            .astype(float)
+            .max()
+        )
+        run_id = runs[runs["params.time"] == str(recent_knn)]["run_id"].item()
+        print()
 
     exist_model = engine.execute(
         SELECT_EXIST_MODEL.format(model_name)
@@ -239,14 +253,13 @@ def save_best_model(model_name, model_type, metric, metric_score):
         )
 
 
-
-# @task
+@task
 def log_experiment(results, host_url, exp_name, metric):
     mlflow.set_tracking_uri(host_url)
     mlflow.set_experiment(exp_name)
     client = MlflowClient()
     exp = client.get_experiment_by_name(exp_name)
-    
+
     best_trial = results.get_best_trial("loss", "min", "last")
     metrics = {
         "loss": best_trial.last_result["loss"],
@@ -271,7 +284,11 @@ def log_experiment(results, host_url, exp_name, metric):
             mlflow.log_metrics(metrics)
             mlflow.log_params(configs)
             mlflow.pytorch.log_model(best_trained_model, artifact_path="model")
-            save_best_model(exp_name, 'pytorch', metric, metrics[metric])
+
+            save_best_model(
+                exp_name, "pytorch", metric, metrics[metric], exp_name
+            )
+        return True
     else:
         best_score = runs[f"metrics.{metric}"].min()
 
@@ -279,53 +296,118 @@ def log_experiment(results, host_url, exp_name, metric):
             with mlflow.start_run(experiment_id=exp_id):
                 mlflow.log_metrics(metrics)
                 mlflow.log_params(configs)
-                mlflow.pytorch.log_model(best_trained_model, artifact_path="model")
-                save_best_model(exp_name, 'pytorch', metric, metrics[metric])
+                mlflow.pytorch.log_model(
+                    best_trained_model, artifact_path="model"
+                )
+
+                save_best_model(
+                    exp_name, "pytorch", metric, metrics[metric], exp_name
+                )
             return True
         else:
             return False
 
-def make_feature_weight(results):
-    last_result = results.get_best_trial("loss", "min", "last")
-    train_df = last_result.last_result['train_df']
 
-# @task
-def case1():
-    print('hihihihihihi')
-# @task
+@task
+def make_feature_weight(results, device):
+    best_trial = results.get_best_trial("loss", "min", "last")
+    train_df = pd.read_csv(
+        "/Users/TFG5076XG/Documents/MLOps/prefect/mnist/mnist_train.csv"
+    )
+    configs = {
+        "l1": best_trial.config["l1"],
+        "lr": best_trial.config["lr"],
+        "batch_size": best_trial.config["batch_size"],
+    }
+    best_trained_model = MnistNet(configs["l1"])
+    best_checkpoint_dir = best_trial.checkpoint.value
+    model_state, optimizer_state = torch.load(
+        os.path.join(best_checkpoint_dir, "checkpoint")
+    )
+    best_trained_model.load_state_dict(model_state)
+    best_trained_model = torch.nn.Sequential(
+        *list(best_trained_model.children())[:-1]
+    )
+    transform = transforms.Compose(
+        [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
+    )
+    trainset = MnistDataset(train_df, transform)
+    train_loader = DataLoader(trainset, batch_size=int(configs["batch_size"]))
+
+    temp = pd.DataFrame(
+        columns=[f"{i}_feature" for i in range(32)], index=train_df.index
+    )
+    batch_index = 0
+    batch_size = train_loader.batch_size
+    optimizer = torch.optim.Adam(
+        best_trained_model.parameters(), lr=configs["lr"]
+    )
+
+    for i, (mini_batch, _) in enumerate(train_loader):  # 미니 배치 단위로 꺼내온다.
+        mini_batch = mini_batch.to(device)
+        optimizer.zero_grad()
+        outputs = best_trained_model(mini_batch)
+        batch_index = i * batch_size
+        temp.iloc[
+            batch_index : batch_index + batch_size, :
+        ] = outputs.detach().numpy()
+
+    temp.reset_index(inplace=True)
+    feature_weight_df = temp
+
+    return feature_weight_df
+
+
+@task
+def train_knn(feature_weight_df, metric, exp_name, results):
+    KNN = KNeighborsClassifier(n_neighbors=3)
+    KNN.fit(
+        feature_weight_df.iloc[:, 1:].values,
+        feature_weight_df.iloc[:, 0].values,
+    )
+    best_trial = results.get_best_trial("loss", "min", "last")
+    metrics = {
+        "loss": best_trial.last_result["loss"],
+        "accuracy": best_trial.last_result["accuracy"],
+    }
+    mlflow.sklearn.log_model(KNN, artifact_path="model")
+    mlflow.log_param("time", time.time())
+    save_best_model("mnist_knn", "sklearn", metric, 9999, exp_name, True)
+
+
+@task
 def case2():
-    print('lwlwlwlwlwlwlw')
+    print("end")
+
 
 # def test(results):
 #     aa = results.get_best_trial("loss", "min", "last")
 #     print(dir(aa))
 #     print(aa.trial_id)
 
-if __name__ == "__main__":
-    data_path = "/Users/don/Documents/MLOps/prefect/mnist/mnist.csv"
-    host_url = "http://localhost:5001"
-    exp_name = "mnist"
-    batch_size = 64
-    learning_rate = 1e-3
-    device = "cpu"
-    l1 = 128
-    num_samples = 1
-    max_num_epochs = 1
-    metric = 'loss'
+# if __name__ == "__main__":
+#     # data_path = "C:\Users\TFG5076XG\Documents\MLOps\prefect\mnist\mnist.csv"
+#     host_url = "http://localhost:5001"
+#     exp_name = "mnist"
+#     batch_size = 64
+#     learning_rate = 1e-3
+#     device = "cpu"
+#     l1 = 128
+#     num_samples = 4
+#     max_num_epochs = 2
+#     metric = 'loss'
 
-    mlflow.set_tracking_uri(host_url)
-    mlflow.set_experiment(exp_name)
+#     mlflow.set_tracking_uri(host_url)
+#     mlflow.set_experiment(exp_name)
 
-    results = tune_cnn(num_samples, max_num_epochs, data_path)
-    # test(results)
-    is_end = log_experiment(results, host_url, exp_name, metric)
-    print(is_end)
-    
-    # make_feature_weight(results)
+#     results = tune_cnn(num_samples, max_num_epochs)
+#     is_end = log_experiment(results, host_url, exp_name, metric)
 
-    # if is_end:
-    #     print('True')
-    # else:
-    #     print('False')
-        
-
+#     if is_end:
+#         print('True')
+#         feature_weight_df = make_feature_weight(results, device)
+#         train_knn(feature_weight_df, metric, exp_name, results)
+#     else:
+#         print('False')
+#         # feature_weight_df = make_feature_weight(results, device)
+#         # train_knn(feature_weight_df, metric, exp_name, results)
