@@ -106,3 +106,4 @@ SELECT_BEST_MODEL = """
     FROM best_model_data
     WHERE model_name = '{}'
 """
+

@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
+import datetime
+import pickle
 from typing import List
 
 import mlflow
 import numpy as np
+import redis
+import xgboost as xgb
 from fastapi import APIRouter
 from starlette.concurrency import run_in_threadpool
 import redis
@@ -14,6 +18,7 @@ from app import models
 from app.api.schemas import ModelCorePrediction
 from app.database import engine
 from app.query import SELECT_BEST_MODEL
+
 from app.utils import ScikitLearnModel
 from logger import L
 from tensorflow.keras.layers import serialize, deserialize
@@ -21,12 +26,39 @@ from tensorflow.keras.layers import serialize, deserialize
 models.Base.metadata.create_all(bind=engine)
 
 client = redis.Redis(host="localhost", port=6379, password=0000, db=0)
+
 host_url = os.getenv('MLFLOW_HOST')
 mlflow.set_tracking_uri(host_url)
 
 router = APIRouter(
-    prefix="/predict", tags=["predict"], responses={404: {"description": "Not Found"}}
+    prefix="/predict",
+    tags=["predict"],
+    responses={404: {"description": "Not Found"}},
 )
+
+
+@router.put("/")
+def predict_insurance(info: ModelCorePrediction, model_name: str):
+    info = info.dict()
+    test_set = xgb.DMatrix(np.array([*info.values()]).reshape(1, -1))
+
+    model = client.get("redis_model")
+
+    if model:
+        model = pickle.loads(model)
+        print(model)
+    else:
+        print("else")
+        artifact_uri = engine.execute(
+            SELECT_BEST_MODEL.format(model_name)
+        ).fetchone()
+        model = mlflow.xgboost.load_model(artifact_uri)
+        client.set(
+            "redis_model", pickle.dumps(model), datetime.timedelta(seconds=5)
+        )
+
+    result = float(model.predict(test_set)[0])
+    return result
 
 
 @router.put("/insurance")
