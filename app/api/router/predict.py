@@ -1,20 +1,28 @@
 # -*- coding: utf-8 -*-
 from typing import List
 
-
+import mlflow
 import numpy as np
 from fastapi import APIRouter
 from starlette.concurrency import run_in_threadpool
+import redis
+import pickle
+import datetime
+import os
 
 from app import models
 from app.api.schemas import ModelCorePrediction
 from app.database import engine
-from app.utils import ScikitLearnModel, my_model
+from app.query import SELECT_BEST_MODEL
+from app.utils import ScikitLearnModel
 from logger import L
-
+from tensorflow.keras.layers import serialize, deserialize
 
 models.Base.metadata.create_all(bind=engine)
 
+client = redis.Redis(host="localhost", port=6379, password=0000, db=0)
+host_url = os.getenv('MLFLOW_HOST')
+mlflow.set_tracking_uri(host_url)
 
 router = APIRouter(
     prefix="/predict", tags=["predict"], responses={404: {"description": "Not Found"}}
@@ -77,17 +85,38 @@ async def predict_temperature(time_series: List[float]):
         """
         none sync 함수를  sync로 만들어 주기 위한 함수이며 입출력은 부모 함수와 같습니다.
         """
-        time_series = np.array(time_series).reshape(1, -1, 1)
-        result = my_model.predict_target(time_series)
+        model_name = 'atmos_tmp'
+        model = client.get(f"{model_name}_cached")
+        if model:
+            print("load model")
+            model = deserialize(pickle.loads(model))
+            client.set(name = f"{model_name}_cached", 
+                       value = pickle.dumps(serialize(model)),
+                       ex = datetime.timedelta(seconds=5))
+            
+        else:
+            print("else")
+            run_id = engine.execute(
+                SELECT_BEST_MODEL.format(model_name)
+            ).fetchone()[0]
+            print("start load")
+            model = mlflow.keras.load_model(f"runs:/{run_id}/model")
+            print("end load")
+            client.set(
+            f"{model_name}_cached", pickle.dumps(serialize(model)), datetime.timedelta(seconds=5)
+            )
+
+        time_series = np.array(time_series).reshape(1, 72, 1)
+        result = model.predict(time_series)
         L.info(
-            f"Predict Args info: {time_series.flatten().tolist()}\n\tmodel_name: {my_model.model_name}\n\tPrediction Result: {result.tolist()[0]}"
+            f"Predict Args info: {time_series.flatten().tolist()}\n\tmodel_name: {model_name}\n\tPrediction Result: {result.tolist()[0]}"
         )
 
-        return {"result": result, "error": None}
+        return {"result": result.tolist(), "error": None}
 
     try:
         result = await run_in_threadpool(sync_pred_ts, time_series)
-        return result.tolist()
+        return result
 
     except Exception as e:
         L.error(e)
