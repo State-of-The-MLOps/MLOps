@@ -12,6 +12,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.functions import now
+from sqlalchemy.sql.sqltypes import Float
 
 from app.database import Base
 
@@ -58,3 +59,13 @@ class TempModelData(Base):
     val_mae = Column(FLOAT, nullable=False)
     train_mse = Column(FLOAT, nullable=False)
     val_mse = Column(FLOAT, nullable=False)
+
+
+class BestModelData(Base):
+    __tablename__ = "best_model_data"
+
+    model_name = Column(String, primary_key=True)
+    run_id = Column(String, nullable=False)
+    model_type = Column(String, nullable=False)
+    metric = Column(String, nullable=False)
+    metric_score = Column(Float, nullable=False)
