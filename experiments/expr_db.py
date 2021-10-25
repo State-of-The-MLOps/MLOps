@@ -1,6 +1,7 @@
 import os
-from dotenv import load_dotenv
+
 import sqlalchemy
+from dotenv import load_dotenv
 
 
 def connect(db="postgres"):

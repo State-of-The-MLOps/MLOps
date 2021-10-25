@@ -3,14 +3,21 @@ import os
 import re
 import subprocess
 
-
 from fastapi import APIRouter
 
-from app.utils import NniWatcher, ExperimentOwl, base_dir, get_free_port, write_yml
+from app.utils import (
+    ExperimentOwl,
+    NniWatcher,
+    base_dir,
+    get_free_port,
+    write_yml,
+)
 from logger import L
 
 router = APIRouter(
-    prefix="/train", tags=["train"], responses={404: {"description": "Not Found"}}
+    prefix="/train",
+    tags=["train"],
+    responses={404: {"description": "Not Found"}},
 )
 
 
@@ -44,14 +51,18 @@ def train_insurance(
     try:
         write_yml(path, experiment_name, experimenter, model_name, version)
         nni_create_result = subprocess.getoutput(
-            "nnictl create --port {} --config {}/{}.yml".format(PORT, path, model_name)
+            "nnictl create --port {} --config {}/{}.yml".format(
+                PORT, path, model_name
+            )
         )
         sucs_msg = "Successfully started experiment!"
 
         if sucs_msg in nni_create_result:
             p = re.compile(r"The experiment id is ([a-zA-Z0-9]+)\n")
             expr_id = p.findall(nni_create_result)[0]
-            nni_watcher = NniWatcher(expr_id, experiment_name, experimenter, version)
+            nni_watcher = NniWatcher(
+                expr_id, experiment_name, experimenter, version
+            )
             m_process = multiprocessing.Process(target=nni_watcher.excute)
             m_process.start()
 
@@ -68,6 +79,7 @@ def train_atmos(expr_name: str):
     """
     온도 시계열과 관련된 학습을 실행하기 위한 API입니다.
 
+
     Args:
         expr_name(str): NNI가 실행할 실험의 이름 입니다. 이 파라미터를 기반으로 project_dir/experiments/[expr_name] 경로로 찾아가 config.yml을 이용하여 NNI를 실행합니다.
 
@@ -83,7 +95,9 @@ def train_atmos(expr_name: str):
 
     try:
         nni_create_result = subprocess.getoutput(
-            "nnictl create --port {} --config {}/config.yml".format(nni_port, expr_path)
+            "nnictl create --port {} --config {}/config.yml".format(
+                nni_port, expr_path
+            )
         )
         sucs_msg = "Successfully started experiment!"
 

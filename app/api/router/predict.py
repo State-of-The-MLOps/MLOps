@@ -1,24 +1,55 @@
 # -*- coding: utf-8 -*-
+import datetime
+import pickle
 from typing import List
 
-
+import mlflow
 import numpy as np
+import redis
+import xgboost as xgb
 from fastapi import APIRouter
 from starlette.concurrency import run_in_threadpool
 
 from app import models
 from app.api.schemas import ModelCorePrediction
 from app.database import engine
+from app.query import SELECT_BEST_MODEL
 from app.utils import ScikitLearnModel, my_model
 from logger import L
 
-
 models.Base.metadata.create_all(bind=engine)
 
+client = redis.Redis(host="localhost", port=6379, password=0000, db=0)
 
 router = APIRouter(
-    prefix="/predict", tags=["predict"], responses={404: {"description": "Not Found"}}
+    prefix="/predict",
+    tags=["predict"],
+    responses={404: {"description": "Not Found"}},
 )
+
+
+@router.put("/")
+def predict_insurance(info: ModelCorePrediction, model_name: str):
+    info = info.dict()
+    test_set = xgb.DMatrix(np.array([*info.values()]).reshape(1, -1))
+
+    model = client.get("redis_model")
+
+    if model:
+        model = pickle.loads(model)
+        print(model)
+    else:
+        print("else")
+        artifact_uri = engine.execute(
+            SELECT_BEST_MODEL.format(model_name)
+        ).fetchone()
+        model = mlflow.xgboost.load_model(artifact_uri)
+        client.set(
+            "redis_model", pickle.dumps(model), datetime.timedelta(seconds=5)
+        )
+
+    result = float(model.predict(test_set)[0])
+    return result
 
 
 @router.put("/insurance")
@@ -83,11 +114,11 @@ async def predict_temperature(time_series: List[float]):
             f"Predict Args info: {time_series.flatten().tolist()}\n\tmodel_name: {my_model.model_name}\n\tPrediction Result: {result.tolist()[0]}"
         )
 
-        return {"result": result, "error": None}
+        return {"result": result.tolist(), "error": None}
 
     try:
         result = await run_in_threadpool(sync_pred_ts, time_series)
-        return result.tolist()
+        return result
 
     except Exception as e:
         L.error(e)

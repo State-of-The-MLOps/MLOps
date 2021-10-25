@@ -1,23 +1,21 @@
 import os
 import sys
 import time
+
 from preprocessing import preprocess
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import numpy as np
 import nni
+import numpy as np
 import pandas as pd
 import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
-from tensorflow.keras.layers import GRU
-from sklearn.metrics import mean_absolute_error, mean_squared_error
-
-
 from expr_db import connect
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+from tensorflow import keras
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+from tensorflow.keras.layers import GRU, Dense
+from tensorflow.keras.models import Sequential
 
 physical_devices = tf.config.list_physical_devices("GPU")
 if physical_devices:
@@ -32,7 +30,9 @@ def make_dataset(data, label, window_size=365, predsize=None):
         for i in range(len(data) - (window_size + predsize)):
             feature_list.append(np.array(data.iloc[i : i + window_size]))
             label_list.append(
-                np.array(label.iloc[i + window_size : i + window_size + predsize])
+                np.array(
+                    label.iloc[i + window_size : i + window_size + predsize]
+                )
             )
     else:
         for i in range(len(data) - window_size):

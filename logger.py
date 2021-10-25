@@ -1,7 +1,7 @@
 import logging
 import logging.handlers
-from colorlog import ColoredFormatter
 
+from colorlog import ColoredFormatter
 
 L = logging.getLogger("snowdeer_log")
 L.setLevel(logging.DEBUG)

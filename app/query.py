@@ -100,3 +100,9 @@ WHERE NOT EXISTS (SELECT 1
 				 FROM atmos_model_metadata as amm 
 				 WHERE amm.model_name = '{mn}');
 """
+
+SELECT_BEST_MODEL = """
+    SELECT artifact_uri
+    FROM best_model_data
+    WHERE model_name = '{}'
+"""
