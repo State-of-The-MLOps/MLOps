@@ -14,8 +14,8 @@ import pickle
 import datetime
 import os
 
-from app import models
-from app.api.schemas import ModelCorePrediction
+from app import schema
+from app.api.data_class import ModelCorePrediction
 from app.database import engine
 from app.query import SELECT_BEST_MODEL
 
@@ -23,7 +23,7 @@ from app.utils import ScikitLearnModel
 from logger import L
 from tensorflow.keras.layers import serialize, deserialize
 
-models.Base.metadata.create_all(bind=engine)
+schema.Base.metadata.create_all(bind=engine)
 
 client = redis.Redis(host="localhost", port=6379, password=0000, db=0)
 
@@ -122,9 +122,6 @@ async def predict_temperature(time_series: List[float]):
         if model:
             print("load model")
             model = deserialize(pickle.loads(model))
-            client.set(name = f"{model_name}_cached", 
-                       value = pickle.dumps(serialize(model)),
-                       ex = datetime.timedelta(seconds=5))
             
         else:
             print("else")
