@@ -68,4 +68,5 @@ class BestModelData(Base):
     run_id = Column(String, nullable=False)
     model_type = Column(String, nullable=False)
     metric = Column(String, nullable=False)
-    metric_score = Column(Float, nullable=False)
+    metric_score = Column(FLOAT, nullable=False)
+
