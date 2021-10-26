@@ -25,10 +25,11 @@ from tensorflow.keras.layers import serialize, deserialize
 
 schema.Base.metadata.create_all(bind=engine)
 
-client = redis.Redis(host="localhost", port=6379, password=0000, db=0)
+client = redis.Redis(host="localhost", port=6379, db=0)
 
 host_url = os.getenv('MLFLOW_HOST')
 mlflow.set_tracking_uri(host_url)
+reset_sec = 5
 
 router = APIRouter(
     prefix="/predict",
@@ -46,6 +47,7 @@ def predict_insurance(info: ModelCorePrediction, model_name: str):
 
     if model:
         model = pickle.loads(model)
+        client.expire("redis_model", reset_sec)
         print(model)
     else:
         print("else")
@@ -97,6 +99,7 @@ async def predict_insurance(info: ModelCorePrediction, model_name: str):
         L.error(e)
         return {"result": "Can't predict", "error": str(e)}
 
+# from app.utils import my_model
 
 @router.put("/atmos")
 async def predict_temperature(time_series: List[float]):
@@ -109,38 +112,45 @@ async def predict_temperature(time_series: List[float]):
     Returns:
         List[float]: 입력받은 시간 이후 24시간 동안의 1시간 간격 온도 예측 시계열 입니다.
     """
+    
     if len(time_series) != 72:
         L.error(f"input time_series: {time_series} is not valid")
         return {"result": "time series must have 72 values", "error": None}
+
+    model_name = 'atmos_tmp'
+    model = client.get(f"{model_name}_cached")
+    if model:
+        print("load cached model")
+        model = deserialize(pickle.loads(model))
+        client.expire(f"{model_name}_cached", reset_sec)
+        
+    else:
+        run_id = engine.execute(
+            SELECT_BEST_MODEL.format(model_name)
+        ).fetchone()[0]
+        print("start load model from redis")
+        model = mlflow.keras.load_model(f"runs:/{run_id}/model")
+        print("end load model from redis")
+        client.set(
+        f"{model_name}_cached", pickle.dumps(serialize(model)), datetime.timedelta(seconds=reset_sec)
+        )
 
     def sync_pred_ts(time_series):
         """
         none sync 함수를  sync로 만들어 주기 위한 함수이며 입출력은 부모 함수와 같습니다.
         """
-        model_name = 'atmos_tmp'
-        model = client.get(f"{model_name}_cached")
-        if model:
-            print("load model")
-            model = deserialize(pickle.loads(model))
-            
-        else:
-            print("else")
-            run_id = engine.execute(
-                SELECT_BEST_MODEL.format(model_name)
-            ).fetchone()[0]
-            print("start load")
-            model = mlflow.keras.load_model(f"runs:/{run_id}/model")
-            print("end load")
-            client.set(
-            f"{model_name}_cached", pickle.dumps(serialize(model)), datetime.timedelta(seconds=5)
-            )
 
         time_series = np.array(time_series).reshape(1, 72, 1)
         result = model.predict(time_series)
         L.info(
             f"Predict Args info: {time_series.flatten().tolist()}\n\tmodel_name: {model_name}\n\tPrediction Result: {result.tolist()[0]}"
         )
-
+#------------------------------------------------------------------
+        # result = my_model.predict_target(time_series)
+        # L.info(
+        #     f"Predict Args info: {time_series.flatten().tolist()}\n\tmodel_name: {my_model.model_name}\n\tPrediction Result: {result.tolist()[0]}"
+        # )
+#------------------------------------------------------------------
         return {"result": result.tolist(), "error": None}
 
     try:
