@@ -1,33 +1,33 @@
 # -*- coding: utf-8 -*-
 import datetime
+import os
 import pickle
 from typing import List
 
 import mlflow
 import numpy as np
+import pandas as pd
 import redis
+import torch
+import torchvision.transforms as transforms
 import xgboost as xgb
 from fastapi import APIRouter
 from starlette.concurrency import run_in_threadpool
-import redis
-import pickle
-import datetime
-import os
+from tensorflow.keras.layers import deserialize, serialize
 
-from app import models
-from app.api.schemas import ModelCorePrediction
+from app import schema
+from app.api.data_class import ModelCorePrediction
 from app.database import engine
 from app.query import SELECT_BEST_MODEL
-
-from app.utils import ScikitLearnModel
+from app.utils import ScikitLearnModel, softmax
 from logger import L
-from tensorflow.keras.layers import serialize, deserialize
 
-models.Base.metadata.create_all(bind=engine)
+schema.Base.metadata.create_all(bind=engine)
 
-client = redis.Redis(host="localhost", port=6379, password=0000, db=0)
+client = redis.Redis(host="localhost", port=6378, password=0000, db=0)
 
-host_url = os.getenv('MLFLOW_HOST')
+host_url = os.getenv("MLFLOW_HOST")
+
 mlflow.set_tracking_uri(host_url)
 
 router = APIRouter(
@@ -37,8 +37,10 @@ router = APIRouter(
 )
 
 
-@router.put("/")
-def predict_insurance(info: ModelCorePrediction, model_name: str):
+@router.put("/insurance")
+def predict_insurance(
+    info: ModelCorePrediction, model_name: str = "insurance"
+):
     info = info.dict()
     test_set = xgb.DMatrix(np.array([*info.values()]).reshape(1, -1))
 
@@ -59,6 +61,35 @@ def predict_insurance(info: ModelCorePrediction, model_name: str):
 
     result = float(model.predict(test_set)[0])
     return result
+
+
+@router.put("/mnist")
+def predict_mnist(num=None):
+    model_name = "mnist"
+
+    # model = client.get(f'{model_name}_cached')
+
+    run_id = engine.execute(SELECT_BEST_MODEL.format(model_name)).fetchone()[0]
+    model = mlflow.pytorch.load_model(f"runs:/{run_id}/model")
+
+    sample_df = pd.read_csv(
+        "/Users/TFG5076XG/Documents/MLOps/prefect/mnist/mnist_valid.csv"
+    )
+    sample_row = sample_df.iloc[0, 1:].values.astype(np.uint8)
+    transform = transforms.Compose(
+        [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
+    )
+    aa = sample_row.reshape(28, 28)
+    sample = transform(aa)
+
+    sample = sample.view(1, 1, 28, 28)
+    result = model.forward(sample)
+
+    percentage = (
+        np.round(softmax(result.detach().numpy()), 2) * 100
+    ).tolist()[0]
+
+    return percentage, percentage.index(max(percentage))
 
 
 @router.put("/insurance")
@@ -117,15 +148,17 @@ async def predict_temperature(time_series: List[float]):
         """
         none sync 함수를  sync로 만들어 주기 위한 함수이며 입출력은 부모 함수와 같습니다.
         """
-        model_name = 'atmos_tmp'
+        model_name = "atmos_tmp"
         model = client.get(f"{model_name}_cached")
         if model:
             print("load model")
             model = deserialize(pickle.loads(model))
-            client.set(name = f"{model_name}_cached", 
-                       value = pickle.dumps(serialize(model)),
-                       ex = datetime.timedelta(seconds=5))
-            
+            client.set(
+                name=f"{model_name}_cached",
+                value=pickle.dumps(serialize(model)),
+                ex=datetime.timedelta(seconds=5),
+            )
+
         else:
             print("else")
             run_id = engine.execute(
@@ -135,7 +168,9 @@ async def predict_temperature(time_series: List[float]):
             model = mlflow.keras.load_model(f"runs:/{run_id}/model")
             print("end load")
             client.set(
-            f"{model_name}_cached", pickle.dumps(serialize(model)), datetime.timedelta(seconds=5)
+                f"{model_name}_cached",
+                pickle.dumps(serialize(model)),
+                datetime.timedelta(seconds=5),
             )
 
         time_series = np.array(time_series).reshape(1, 72, 1)

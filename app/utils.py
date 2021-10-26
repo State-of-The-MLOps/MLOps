@@ -11,6 +11,7 @@ import subprocess
 import time
 import zipfile
 
+import numpy as np
 import tensorflow as tf
 import yaml
 
@@ -25,6 +26,12 @@ base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 physical_devices = tf.config.list_physical_devices("GPU")
 if physical_devices:
     tf.config.experimental.set_memory_growth(physical_devices[0], enable=True)
+
+
+def softmax(x):
+
+    f_x = np.exp(x) / np.sum(np.exp(x))
+    return f_x
 
 
 class CoreModel:
