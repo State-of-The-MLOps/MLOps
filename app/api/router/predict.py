@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import datetime
+import io
 import os
 import pickle
 from typing import List
@@ -64,18 +65,44 @@ def predict_insurance(
 
 
 @router.put("/mnist")
-def predict_mnist(num=None):
+def predict_mnist(num=1):
     model_name = "mnist"
+    model_name2 = "mnist_knn"
 
-    # model = client.get(f'{model_name}_cached')
+    Net1 = client.get(f"{model_name}_cached")
+    knn_model = client.get(f"{model_name2}_cached")
+    if Net1:
+        stream = io.BytesIO(Net1)  # implements seek()
+        Net1 = torch.load(stream)
+    else:
+        run_id = engine.execute(
+            SELECT_BEST_MODEL.format(model_name)
+        ).fetchone()[0]
+        Net1 = mlflow.pytorch.load_model(f"runs:/{run_id}/model")
+        client.set(
+            f"{model_name}_cached",
+            Net1.save_to_buffer(),
+            datetime.timedelta(seconds=40),
+        )
 
-    run_id = engine.execute(SELECT_BEST_MODEL.format(model_name)).fetchone()[0]
-    model = mlflow.pytorch.load_model(f"runs:/{run_id}/model")
+    if knn_model:
+        knn_model = pickle.loads(knn_model)
+    else:
+        run_id2 = engine.execute(
+            SELECT_BEST_MODEL.format(model_name2)
+        ).fetchone()[0]
+        knn_model = mlflow.sklearn.load_model(f"runs:/{run_id2}/model")
+        client.set(
+            f"{model_name2}_cached",
+            pickle.dumps(knn_model),
+            datetime.timedelta(seconds=40),
+        )
 
+    # Net1
     sample_df = pd.read_csv(
         "/Users/TFG5076XG/Documents/MLOps/prefect/mnist/mnist_valid.csv"
     )
-    sample_row = sample_df.iloc[0, 1:].values.astype(np.uint8)
+    sample_row = sample_df.iloc[int(num), 1:].values.astype(np.uint8)
     transform = transforms.Compose(
         [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
     )
@@ -83,13 +110,24 @@ def predict_mnist(num=None):
     sample = transform(aa)
 
     sample = sample.view(1, 1, 28, 28)
-    result = model.forward(sample)
+    result = Net1.forward(sample)
 
-    percentage = (
-        np.round(softmax(result.detach().numpy()), 2) * 100
-    ).tolist()[0]
+    p_res = softmax(result.detach().numpy()) * 100
+    percentage = np.around(p_res[0], 2).tolist()
 
-    return percentage, percentage.index(max(percentage))
+    # Net2
+    Net2 = torch.nn.Sequential(*list(Net1.children())[:-1])
+    result = Net2.forward(sample)
+    result = result.detach().numpy()
+
+    # KNN
+    knn_result = knn_model.predict(result)
+    df2 = pd.read_csv(
+        "/Users/TFG5076XG/Documents/MLOps/prefect/mnist/mnist_train.csv"
+    )
+    xai_result = df2.iloc[knn_result, 1:].values[0].tolist()
+
+    return percentage, percentage.index(max(percentage)), xai_result
 
 
 @router.put("/insurance")
