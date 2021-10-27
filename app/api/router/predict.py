@@ -12,6 +12,7 @@ import redis
 import torch
 import torchvision.transforms as transforms
 import xgboost as xgb
+from dotenv import load_dotenv
 from fastapi import APIRouter
 from starlette.concurrency import run_in_threadpool
 from tensorflow.keras.layers import deserialize, serialize
@@ -20,19 +21,22 @@ from app import schema
 from app.api.data_class import ModelCorePrediction
 from app.database import engine
 from app.query import SELECT_BEST_MODEL
-from app.utils import ScikitLearnModel, softmax
+from app.utils import ScikitLearnModel, load_data_cloud, softmax
 from logger import L
+
+load_dotenv()
 
 schema.Base.metadata.create_all(bind=engine)
 
-pool = redis.ConnectionPool(host='localhost', port=6379, db=0)
+pool = redis.ConnectionPool(host="localhost", port=6379, db=0)
 client = redis.Redis(connection_pool=pool)
 
 host_url = os.getenv("MLFLOW_HOST")
-
-
 mlflow.set_tracking_uri(host_url)
 reset_sec = 5
+CLOUD_STORAGE_NAME = os.getenv("CLOUD_STORAGE_NAME")
+CLOUD_TRAIN_MNIST = os.getenv("CLOUD_TRAIN_MNIST")
+CLOUD_VALID_MNIST = os.getenv("CLOUD_VALID_MNIST")
 
 router = APIRouter(
     prefix="/predict",
@@ -53,13 +57,11 @@ def predict_insurance(
     if model:
         model = pickle.loads(model)
         client.expire("redis_model", reset_sec)
-        print(model)
     else:
-        print("else")
-        artifact_uri = engine.execute(
+        run_id = engine.execute(
             SELECT_BEST_MODEL.format(model_name)
-        ).fetchone()
-        model = mlflow.xgboost.load_model(artifact_uri)
+        ).fetchone()[0]
+        model = mlflow.xgboost.load_model(f"runs:/{run_id}/model")
         client.set(
             "redis_model", pickle.dumps(model), datetime.timedelta(seconds=5)
         )
@@ -103,9 +105,7 @@ def predict_mnist(num=1):
         )
 
     # Net1
-    sample_df = pd.read_csv(
-        "/Users/TFG5076XG/Documents/MLOps/prefect/mnist/mnist_valid.csv"
-    )
+    sample_df = load_data_cloud(CLOUD_STORAGE_NAME, CLOUD_VALID_MNIST)
     sample_row = sample_df.iloc[int(num), 1:].values.astype(np.uint8)
     transform = transforms.Compose(
         [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
@@ -126,9 +126,7 @@ def predict_mnist(num=1):
 
     # KNN
     knn_result = knn_model.predict(result)
-    df2 = pd.read_csv(
-        "/Users/TFG5076XG/Documents/MLOps/prefect/mnist/mnist_train.csv"
-    )
+    df2 = load_data_cloud(CLOUD_STORAGE_NAME, CLOUD_TRAIN_MNIST)
     xai_result = df2.iloc[knn_result, 1:].values[0].tolist()
 
     return percentage, percentage.index(max(percentage)), xai_result
@@ -170,6 +168,7 @@ async def predict_insurance(info: ModelCorePrediction, model_name: str):
         L.error(e)
         return {"result": "Can't predict", "error": str(e)}
 
+
 @router.put("/atmos")
 async def predict_temperature(time_series: List[float]):
     """
@@ -181,18 +180,18 @@ async def predict_temperature(time_series: List[float]):
     Returns:
         List[float]: 입력받은 시간 이후 24시간 동안의 1시간 간격 온도 예측 시계열 입니다.
     """
-    
+
     if len(time_series) != 72:
         L.error(f"input time_series: {time_series} is not valid")
         return {"result": "time series must have 72 values", "error": None}
 
-    model_name = 'atmos_tmp'
+    model_name = "atmos_tmp"
     model = client.get(f"{model_name}_cached")
     if model:
         print("predict cached model")
         model = deserialize(pickle.loads(model))
         client.expire(f"{model_name}_cached", reset_sec)
-        
+
     else:
         run_id = engine.execute(
             SELECT_BEST_MODEL.format(model_name)
@@ -201,7 +200,9 @@ async def predict_temperature(time_series: List[float]):
         model = mlflow.keras.load_model(f"runs:/{run_id}/model")
         print("end load model from mlflow")
         client.set(
-        f"{model_name}_cached", pickle.dumps(serialize(model)), datetime.timedelta(seconds=reset_sec)
+            f"{model_name}_cached",
+            pickle.dumps(serialize(model)),
+            datetime.timedelta(seconds=reset_sec),
         )
 
     def sync_pred_ts(time_series):
@@ -241,7 +242,7 @@ async def predict_temperature(time_series: List[float]):
         )
 
         return {"result": result.tolist(), "error": None}
-    
+
     try:
         result = await run_in_threadpool(sync_pred_ts, time_series)
         return result
