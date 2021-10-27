@@ -10,6 +10,7 @@ from prefect import task
 from prefect.tasks.prefect.flow_run_cancel import CancelFlowRun
 import mlflow
 
+
 @task
 def data_extract(api_key):
     logger = prefect.context.get("logger")
@@ -170,3 +171,23 @@ def log_best_model(is_end, host_url, exp_name, metric, model_type):
         metric_score=best_score,
         model_name=exp_name,
     )
+
+
+# if __name__ == '__main__':
+#     host_url = os.getenv('MLFLOW_HOST')
+#     exp_name = "atmos_tmp"
+#     metric = "mae"
+#     model_type = "tensorflow"
+#     num_trials = 10
+#     extr_result = data_extract(os.getenv('ATMOS_API_KEY'))
+#     valid_result = data_validation(extr_result[1])
+#     load_data = data_load_to_db(valid_result[1],
+#                     os.getenv("POSTGRES_USER"),
+#                     os.getenv("POSTGRES_SERVER"),
+#                     os.getenv("POSTGRES_PASSWORD"))
+#     is_end = train_mlflow_ray(load_data,
+#                                 host_url,                                      
+#                                 exp_name,
+#                                 metric,
+#                                 num_trials)
+#     log_best_model(is_end, host_url, exp_name, metric, model_type)

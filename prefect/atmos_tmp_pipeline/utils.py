@@ -39,7 +39,7 @@ def connect(db):
     return connection
 
 conn = connect('postgres')
-
+load_dotenv(verbose=True)
 
 def load_to_db(data):
     data.to_sql("atmos_stn108", conn, index=False, if_exists='append')

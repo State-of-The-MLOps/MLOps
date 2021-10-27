@@ -6,6 +6,6 @@ log.txt
 experiments/**/temp/
 .ssl/
 prefect/atmos_tmp_pipeline/ray_mlflow
-prefect/atmos_tmp_pipeline/start_mlflow.sh
+prefect/atmos_tmp_pipeline/*.sh
 mlruns
 exp_models
