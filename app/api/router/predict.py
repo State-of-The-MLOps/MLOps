@@ -1,34 +1,36 @@
 # -*- coding: utf-8 -*-
 import datetime
+import io
+import os
 import pickle
 from typing import List
 
 import mlflow
 import numpy as np
+import pandas as pd
 import redis
+import torch
+import torchvision.transforms as transforms
 import xgboost as xgb
 from fastapi import APIRouter
 from starlette.concurrency import run_in_threadpool
-import redis
-import pickle
-import datetime
-import os
+from tensorflow.keras.layers import deserialize, serialize
 
 from app import schema
 from app.api.data_class import ModelCorePrediction
 from app.database import engine
 from app.query import SELECT_BEST_MODEL
-
-from app.utils import ScikitLearnModel
+from app.utils import ScikitLearnModel, softmax
 from logger import L
-from tensorflow.keras.layers import serialize, deserialize
 
 schema.Base.metadata.create_all(bind=engine)
 
 pool = redis.ConnectionPool(host='localhost', port=6379, db=0)
 client = redis.Redis(connection_pool=pool)
 
-host_url = os.getenv('MLFLOW_HOST')
+host_url = os.getenv("MLFLOW_HOST")
+
+
 mlflow.set_tracking_uri(host_url)
 reset_sec = 5
 
@@ -39,8 +41,10 @@ router = APIRouter(
 )
 
 
-@router.put("/")
-def predict_insurance(info: ModelCorePrediction, model_name: str):
+@router.put("/insurance")
+def predict_insurance(
+    info: ModelCorePrediction, model_name: str = "insurance"
+):
     info = info.dict()
     test_set = xgb.DMatrix(np.array([*info.values()]).reshape(1, -1))
 
@@ -62,6 +66,72 @@ def predict_insurance(info: ModelCorePrediction, model_name: str):
 
     result = float(model.predict(test_set)[0])
     return result
+
+
+@router.put("/mnist")
+def predict_mnist(num=1):
+    model_name = "mnist"
+    model_name2 = "mnist_knn"
+
+    Net1 = client.get(f"{model_name}_cached")
+    knn_model = client.get(f"{model_name2}_cached")
+    if Net1:
+        stream = io.BytesIO(Net1)  # implements seek()
+        Net1 = torch.load(stream)
+    else:
+        run_id = engine.execute(
+            SELECT_BEST_MODEL.format(model_name)
+        ).fetchone()[0]
+        Net1 = mlflow.pytorch.load_model(f"runs:/{run_id}/model")
+        client.set(
+            f"{model_name}_cached",
+            Net1.save_to_buffer(),
+            datetime.timedelta(seconds=40),
+        )
+
+    if knn_model:
+        knn_model = pickle.loads(knn_model)
+    else:
+        run_id2 = engine.execute(
+            SELECT_BEST_MODEL.format(model_name2)
+        ).fetchone()[0]
+        knn_model = mlflow.sklearn.load_model(f"runs:/{run_id2}/model")
+        client.set(
+            f"{model_name2}_cached",
+            pickle.dumps(knn_model),
+            datetime.timedelta(seconds=40),
+        )
+
+    # Net1
+    sample_df = pd.read_csv(
+        "/Users/TFG5076XG/Documents/MLOps/prefect/mnist/mnist_valid.csv"
+    )
+    sample_row = sample_df.iloc[int(num), 1:].values.astype(np.uint8)
+    transform = transforms.Compose(
+        [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
+    )
+    aa = sample_row.reshape(28, 28)
+    sample = transform(aa)
+
+    sample = sample.view(1, 1, 28, 28)
+    result = Net1.forward(sample)
+
+    p_res = softmax(result.detach().numpy()) * 100
+    percentage = np.around(p_res[0], 2).tolist()
+
+    # Net2
+    Net2 = torch.nn.Sequential(*list(Net1.children())[:-1])
+    result = Net2.forward(sample)
+    result = result.detach().numpy()
+
+    # KNN
+    knn_result = knn_model.predict(result)
+    df2 = pd.read_csv(
+        "/Users/TFG5076XG/Documents/MLOps/prefect/mnist/mnist_train.csv"
+    )
+    xai_result = df2.iloc[knn_result, 1:].values[0].tolist()
+
+    return percentage, percentage.index(max(percentage)), xai_result
 
 
 @router.put("/insurance")
@@ -138,6 +208,31 @@ async def predict_temperature(time_series: List[float]):
         """
         none sync 함수를  sync로 만들어 주기 위한 함수이며 입출력은 부모 함수와 같습니다.
         """
+
+        model_name = "atmos_tmp"
+        model = client.get(f"{model_name}_cached")
+        if model:
+            print("load model")
+            model = deserialize(pickle.loads(model))
+            client.set(
+                name=f"{model_name}_cached",
+                value=pickle.dumps(serialize(model)),
+                ex=datetime.timedelta(seconds=5),
+            )
+
+        else:
+            print("else")
+            run_id = engine.execute(
+                SELECT_BEST_MODEL.format(model_name)
+            ).fetchone()[0]
+            print("start load")
+            model = mlflow.keras.load_model(f"runs:/{run_id}/model")
+            print("end load")
+            client.set(
+                f"{model_name}_cached",
+                pickle.dumps(serialize(model)),
+                datetime.timedelta(seconds=5),
+            )
 
         time_series = np.array(time_series).reshape(1, 72, 1)
         result = model.predict(time_series)

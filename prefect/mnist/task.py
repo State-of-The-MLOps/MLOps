@@ -13,6 +13,7 @@ import torch.optim as optim
 import torchvision
 import torchvision.transforms as transforms
 from mlflow.tracking import MlflowClient
+from model import MnistNet
 from query import INSERT_BEST_MODEL, SELECT_EXIST_MODEL, UPDATE_BEST_MODEL
 from ray import tune
 from ray.tune import CLIReporter
@@ -45,34 +46,6 @@ class MnistDataset(Dataset):
             image = self.transform(image)
 
         return image, label
-
-
-class MnistNet(torch.nn.Module):
-    def __init__(self, l1):
-        super(MnistNet, self).__init__()
-        self.layer1 = torch.nn.Sequential(
-            torch.nn.Conv2d(1, 32, kernel_size=3, stride=1, padding=1),
-            torch.nn.ReLU(),
-            torch.nn.MaxPool2d(kernel_size=2, stride=2),
-        )
-        self.layer2 = torch.nn.Sequential(
-            torch.nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
-            torch.nn.ReLU(),
-            torch.nn.MaxPool2d(kernel_size=2, stride=2),
-        )
-        self.flatten = torch.nn.Flatten()
-        self.fc = torch.nn.Linear(7 * 7 * 64, l1, bias=True)
-        self.fc2 = torch.nn.Linear(l1, 32, bias=True)
-        self.last_layer = torch.nn.Linear(32, 10, bias=True)
-
-    def forward(self, x):
-        out = self.layer1(x)
-        out = self.layer2(out)
-        out = self.flatten(out)
-        out = self.fc(out)
-        out = self.fc2(out)
-        out = self.last_layer(out)
-        return out
 
 
 def load_data():
@@ -277,6 +250,7 @@ def log_experiment(results, host_url, exp_name, metric):
         os.path.join(best_checkpoint_dir, "checkpoint")
     )
     best_trained_model.load_state_dict(model_state)
+    best_trained_model = torch.jit.script(best_trained_model)
     exp_id = exp.experiment_id
     runs = mlflow.search_runs([exp_id])
     if runs.empty:
@@ -299,7 +273,6 @@ def log_experiment(results, host_url, exp_name, metric):
                 mlflow.pytorch.log_model(
                     best_trained_model, artifact_path="model"
                 )
-
                 save_best_model(
                     exp_name, "pytorch", metric, metrics[metric], exp_name
                 )
@@ -393,7 +366,7 @@ def case2():
 #     learning_rate = 1e-3
 #     device = "cpu"
 #     l1 = 128
-#     num_samples = 4
+#     num_samples = 6
 #     max_num_epochs = 2
 #     metric = 'loss'
 
