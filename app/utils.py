@@ -126,10 +126,6 @@ class TensorFlowModel(CoreModel):
         self.model = tf.keras.models.load_model(model_path)
 
 
-my_model = TensorFlowModel("test_model")
-my_model.load_model()
-
-
 def write_yml(path, experiment_name, experimenter, model_name, version):
     """
     NNI 실험을 시작하기 위한 config.yml파일을 작성하는 함수 입니다.

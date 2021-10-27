@@ -1,20 +1,18 @@
 from abc import ABC, abstractmethod
 from dotenv import load_dotenv
 import os
-import sys
-import time
 import sqlalchemy
 import pandas as pd
 
 import numpy as np
 import pandas as pd
-import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.layers import GRU
 from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.model_selection import train_test_split
 from ray import tune
 import mlflow
 from mlflow.tracking import MlflowClient
@@ -41,7 +39,7 @@ def connect(db):
     return connection
 
 conn = connect('postgres')
-
+load_dotenv(verbose=True)
 
 def load_to_db(data):
     data.to_sql("atmos_stn108", conn, index=False, if_exists='append')
