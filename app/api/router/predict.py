@@ -4,6 +4,7 @@ import io
 import os
 import pickle
 from typing import List
+import time
 
 import mlflow
 import numpy as np
@@ -180,29 +181,47 @@ async def predict_temperature(time_series: List[float]):
     Returns:
         List[float]: 입력받은 시간 이후 24시간 동안의 1시간 간격 온도 예측 시계열 입니다.
     """
-
+    
     if len(time_series) != 72:
         L.error(f"input time_series: {time_series} is not valid")
         return {"result": "time series must have 72 values", "error": None}
 
-    model_name = "atmos_tmp"
+    model_name = 'atmos_tmp'
+    # start time cached
+    a = time.time()
     model = client.get(f"{model_name}_cached")
+    # end time cached
+    b = time.time()
+    # print("load from redis: ", b-a)
+    L.info(f"load from redis:{b-a}")
+
     if model:
         print("predict cached model")
+        # start time des
+        a = time.time()
         model = deserialize(pickle.loads(model))
+        # end time des
+        b = time.time()
+        # print("deserialize: ", b-a)
+        L.info(f"deserialize:{b-a}")
         client.expire(f"{model_name}_cached", reset_sec)
-
+        
     else:
+        # start time from local storage
+        a = time.time()
         run_id = engine.execute(
             SELECT_BEST_MODEL.format(model_name)
         ).fetchone()[0]
         print("start load model from mlflow")
         model = mlflow.keras.load_model(f"runs:/{run_id}/model")
+        # end time from local storage
+        b = time.time()
+        # print("load from DB:", b-a)
+        L.info(f"load from DB:{b-a}")
+
         print("end load model from mlflow")
         client.set(
-            f"{model_name}_cached",
-            pickle.dumps(serialize(model)),
-            datetime.timedelta(seconds=reset_sec),
+        f"{model_name}_cached", pickle.dumps(serialize(model)), datetime.timedelta(seconds=reset_sec)
         )
 
     def sync_pred_ts(time_series):
@@ -212,12 +231,12 @@ async def predict_temperature(time_series: List[float]):
 
         time_series = np.array(time_series).reshape(1, 72, 1)
         result = model.predict(time_series)
-        L.info(
-            f"Predict Args info: {time_series.flatten().tolist()}\n\tmodel_name: {model_name}\n\tPrediction Result: {result.tolist()[0]}"
-        )
+        # L.info(
+        #     f"Predict Args info: {time_series.flatten().tolist()}\n\tmodel_name: {model_name}\n\tPrediction Result: {result.tolist()[0]}"
+        # )
 
         return {"result": result.tolist(), "error": None}
-
+    
     try:
         result = await run_in_threadpool(sync_pred_ts, time_series)
         return result
