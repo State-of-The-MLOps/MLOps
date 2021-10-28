@@ -5,6 +5,7 @@ import os
 import pickle
 from typing import List
 import time
+import asyncio
 
 import mlflow
 import numpy as np
@@ -22,7 +23,7 @@ from app import schema
 from app.api.data_class import ModelCorePrediction
 from app.database import engine
 from app.query import SELECT_BEST_MODEL
-from app.utils import ScikitLearnModel, load_data_cloud, softmax
+from app.utils import ScikitLearnModel, load_data_cloud, model_timer, softmax
 from logger import L
 
 load_dotenv()
@@ -237,6 +238,63 @@ async def predict_temperature(time_series: List[float]):
 
         return {"result": result.tolist(), "error": None}
     
+    try:
+        result = await run_in_threadpool(sync_pred_ts, time_series)
+        return result
+
+    except Exception as e:
+        L.error(e)
+        return {"result": "Can't predict", "error": str(e)}
+
+
+lock = asyncio.Lock()
+atmos_model_cache = model_timer()
+@router.put("/atmos_timer")
+async def predict_temperature_(time_series: List[float]):
+    """
+    온도 1시간 간격 시계열을 입력받아 이후 24시간 동안의 온도를 1시간 간격의 시계열로 예측합니다.
+    Args:
+        time_series(List): 72시간 동안의 1시간 간격 온도 시계열 입니다. 72개의 원소를 가져야 합니다.
+    Returns:
+        List[float]: 입력받은 시간 이후 24시간 동안의 1시간 간격 온도 예측 시계열 입니다.
+    """
+
+    global lock
+
+    if len(time_series) != 72:
+        L.error(f"input time_series: {time_series} is not valid")
+        return {"result": "time series must have 72 values", "error": None}
+
+    model_name = "atmos_tmp"
+
+    if not atmos_model_cache.is_model():
+        async with lock:
+            if not atmos_model_cache.is_model():
+                run_id = engine.execute(
+                    SELECT_BEST_MODEL.format(model_name)
+                ).fetchone()[0]  
+                print("start load model from mlflow")
+                atmos_model_cache.caching_model(
+                    mlflow.keras.load_model(f"runs:/{run_id}/model")
+                    )
+                print("end load model from mlflow")
+    
+
+    def sync_pred_ts(time_series):
+        """
+        none sync 함수를  sync로 만들어 주기 위한 함수이며 입출력은 부모 함수와 같습니다.
+        """
+
+        time_series = np.array(time_series).reshape(1, 72, 1)
+        result = atmos_model_cache.predict(time_series)
+        atmos_model_cache.reset_timer()
+        L.info(
+            f"Predict Args info: {time_series.flatten().tolist()}\n\tmodel_name: {model_name}\n\tPrediction Result: {result.tolist()[0]}"
+        )
+
+        return {"result": result.tolist(), "error": None}
+
+
     try:
         result = await run_in_threadpool(sync_pred_ts, time_series)
         return result

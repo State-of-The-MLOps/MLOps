@@ -1,7 +1,7 @@
 import codecs
 import glob
 import io
-import multiprocessing
+import threading
 import os
 import pickle
 import re
@@ -563,3 +563,55 @@ class ExperimentOwl:
         model_path = os.path.join(self.experiment_path, "temp", "*")
         exprs = glob.glob(model_path)
         [shutil.rmtree(_) for _ in exprs]
+
+
+class model_timer:
+    def __init__(self, caching_time=5):
+        self._model = None
+        self._caching_time = caching_time
+        self._reset_flag = False
+
+
+    def caching_model(self, model, caching_time=False):
+        if caching_time:
+            self._change_timedelta(caching_time)
+        self._model = model
+        self._reset_flag = True
+        cleaner = threading.Thread(target=self._model_cleaner)
+        cleaner.start()
+
+
+    def _model_cleaner(self):
+        while self._reset_flag:
+            self._reset_flag = False
+            time.sleep(self._caching_time)
+        self._model = None # what is difference between "del obj" and "obj=None?"
+
+
+    def get_model(self):
+        self._reset_flag = True
+        return self._model
+
+
+    def reset_timer(self, caching_time=False):
+        if caching_time:
+            self._change_timedelta(caching_time)
+        self._reset_flag = True
+
+
+    def _change_timedelta(self, caching_time):
+        if not (isinstance(caching_time, int)|
+                isinstance(caching_time, float)):
+
+                print((f"timedelta must be int or float! "
+                       f"\"{caching_time}\"(type {type(caching_time)}) isn't applied"))
+        else:
+            self._caching_time = caching_time
+
+
+    def is_model(self):
+        return True if self._model else False
+
+
+    def predict(self, data):
+        return self._model.predict(data)
