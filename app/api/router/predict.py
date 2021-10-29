@@ -23,7 +23,7 @@ from app import schema
 from app.api.data_class import ModelCorePrediction
 from app.database import engine
 from app.query import SELECT_BEST_MODEL
-from app.utils import ScikitLearnModel, load_data_cloud, model_timer, softmax
+from app.utils import ScikitLearnModel, load_data_cloud, VarTimer, softmax
 from logger import L
 
 load_dotenv()
@@ -248,7 +248,7 @@ async def predict_temperature(time_series: List[float]):
 
 
 lock = asyncio.Lock()
-atmos_model_cache = model_timer()
+atmos_model_cache = VarTimer()
 @router.put("/atmos_timer")
 async def predict_temperature_(time_series: List[float]):
     """
@@ -267,14 +267,14 @@ async def predict_temperature_(time_series: List[float]):
 
     model_name = "atmos_tmp"
 
-    if not atmos_model_cache.is_model():
+    if not atmos_model_cache.is_var:
         async with lock:
-            if not atmos_model_cache.is_model():
+            if not atmos_model_cache.is_var:
                 run_id = engine.execute(
                     SELECT_BEST_MODEL.format(model_name)
                 ).fetchone()[0]  
                 print("start load model from mlflow")
-                atmos_model_cache.caching_model(
+                atmos_model_cache.cache_var(
                     mlflow.keras.load_model(f"runs:/{run_id}/model")
                     )
                 print("end load model from mlflow")
@@ -286,7 +286,7 @@ async def predict_temperature_(time_series: List[float]):
         """
 
         time_series = np.array(time_series).reshape(1, 72, 1)
-        result = atmos_model_cache.predict(time_series)
+        result = atmos_model_cache.get_var().predict(time_series)
         atmos_model_cache.reset_timer()
         L.info(
             f"Predict Args info: {time_series.flatten().tolist()}\n\tmodel_name: {model_name}\n\tPrediction Result: {result.tolist()[0]}"

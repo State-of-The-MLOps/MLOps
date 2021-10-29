@@ -565,32 +565,32 @@ class ExperimentOwl:
         [shutil.rmtree(_) for _ in exprs]
 
 
-class model_timer:
+class VarTimer:
     def __init__(self, caching_time=5):
-        self._model = None
+        self._var = None
         self._caching_time = caching_time
         self._reset_flag = False
 
 
-    def caching_model(self, model, caching_time=False):
+    def cache_var(self, model, caching_time=False):
         if caching_time:
             self._change_timedelta(caching_time)
-        self._model = model
+        self._var = model
         self._reset_flag = True
-        cleaner = threading.Thread(target=self._model_cleaner)
+        cleaner = threading.Thread(target=self._value_cleaner)
         cleaner.start()
 
 
-    def _model_cleaner(self):
+    def _value_cleaner(self):
         while self._reset_flag:
             self._reset_flag = False
             time.sleep(self._caching_time)
-        self._model = None # what is difference between "del obj" and "obj=None?"
+        self._var = None
 
 
-    def get_model(self):
+    def get_var(self):
         self._reset_flag = True
-        return self._model
+        return self._var
 
 
     def reset_timer(self, caching_time=False):
@@ -608,10 +608,6 @@ class model_timer:
         else:
             self._caching_time = caching_time
 
-
-    def is_model(self):
-        return True if self._model else False
-
-
-    def predict(self, data):
-        return self._model.predict(data)
+    @property
+    def is_var(self):
+        return True if self._var else False
