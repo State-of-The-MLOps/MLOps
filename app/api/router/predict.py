@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
+import asyncio
 import datetime
 import io
 import os
 import pickle
-from typing import List
 import time
-import asyncio
+from typing import List
 
 import mlflow
 import numpy as np
@@ -23,7 +23,13 @@ from app import schema
 from app.api.data_class import ModelCorePrediction
 from app.database import engine
 from app.query import SELECT_BEST_MODEL
-from app.utils import ScikitLearnModel, load_data_cloud, VarTimer, softmax
+from app.utils import (
+    CachingModel,
+    ScikitLearnModel,
+    VarTimer,
+    load_data_cloud,
+    softmax,
+)
 from logger import L
 
 load_dotenv()
@@ -72,64 +78,51 @@ def predict_insurance(
     return result
 
 
+mnist_lock, knn_lock = asyncio.Lock(), asyncio.Lock()
+mnist_model = CachingModel("pytorch", 30)
+knn_model = CachingModel("sklearn", 30)
+data1_lock, data2_lock = asyncio.Lock(), asyncio.Lock()  # 임시
+sample_df, train_df = VarTimer(), VarTimer()  # 임시
+
+
 @router.put("/mnist")
-def predict_mnist(num=1):
+async def predict_mnist(num=1):
+
+    global mnist_lock, knn_lock, sample_df, train_df
+    global mnist_model, knn_model
     model_name = "mnist"
     model_name2 = "mnist_knn"
 
-    Net1 = client.get(f"{model_name}_cached")
-    knn_model = client.get(f"{model_name2}_cached")
-    if Net1:
-        stream = io.BytesIO(Net1)  # implements seek()
-        Net1 = torch.load(stream)
-    else:
-        run_id = engine.execute(
-            SELECT_BEST_MODEL.format(model_name)
-        ).fetchone()[0]
-        Net1 = mlflow.pytorch.load_model(f"runs:/{run_id}/model")
-        client.set(
-            f"{model_name}_cached",
-            Net1.save_to_buffer(),
-            datetime.timedelta(seconds=40),
-        )
-
-    if knn_model:
-        knn_model = pickle.loads(knn_model)
-    else:
-        run_id2 = engine.execute(
-            SELECT_BEST_MODEL.format(model_name2)
-        ).fetchone()[0]
-        knn_model = mlflow.sklearn.load_model(f"runs:/{run_id2}/model")
-        client.set(
-            f"{model_name2}_cached",
-            pickle.dumps(knn_model),
-            datetime.timedelta(seconds=40),
-        )
-
-    # Net1
-    sample_df = load_data_cloud(CLOUD_STORAGE_NAME, CLOUD_VALID_MNIST)
+    # temp process
+    if not isinstance(sample_df, pd.DataFrame):
+        sample_df = load_data_cloud(CLOUD_STORAGE_NAME, CLOUD_VALID_MNIST)
     sample_row = sample_df.iloc[int(num), 1:].values.astype(np.uint8)
     transform = transforms.Compose(
         [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
     )
     aa = sample_row.reshape(28, 28)
     sample = transform(aa)
-
     sample = sample.view(1, 1, 28, 28)
-    result = Net1.forward(sample)
 
+    mnist_model.get_model(model_name)
+    knn_model.get_model(model_name2)
+
+    # Net1
+    result = mnist_model.predict(sample)
     p_res = softmax(result.detach().numpy()) * 100
     percentage = np.around(p_res[0], 2).tolist()
 
     # Net2
-    Net2 = torch.nn.Sequential(*list(Net1.children())[:-1])
-    result = Net2.forward(sample)
+    result = mnist_model.predict(sample, True)
     result = result.detach().numpy()
 
-    # KNN
     knn_result = knn_model.predict(result)
-    df2 = load_data_cloud(CLOUD_STORAGE_NAME, CLOUD_TRAIN_MNIST)
-    xai_result = df2.iloc[knn_result, 1:].values[0].tolist()
+
+    # KNN
+    if not isinstance(train_df, pd.DataFrame):
+        train_df = load_data_cloud(CLOUD_STORAGE_NAME, CLOUD_TRAIN_MNIST)
+
+    xai_result = train_df.iloc[knn_result, 1:].values[0].tolist()
 
     return percentage, percentage.index(max(percentage)), xai_result
 
@@ -182,12 +175,12 @@ async def predict_temperature(time_series: List[float]):
     Returns:
         List[float]: 입력받은 시간 이후 24시간 동안의 1시간 간격 온도 예측 시계열 입니다.
     """
-    
+
     if len(time_series) != 72:
         L.error(f"input time_series: {time_series} is not valid")
         return {"result": "time series must have 72 values", "error": None}
 
-    model_name = 'atmos_tmp'
+    model_name = "atmos_tmp"
     # start time cached
     a = time.time()
     model = client.get(f"{model_name}_cached")
@@ -206,7 +199,7 @@ async def predict_temperature(time_series: List[float]):
         # print("deserialize: ", b-a)
         L.info(f"deserialize:{b-a}")
         client.expire(f"{model_name}_cached", reset_sec)
-        
+
     else:
         # start time from local storage
         a = time.time()
@@ -222,7 +215,9 @@ async def predict_temperature(time_series: List[float]):
 
         print("end load model from mlflow")
         client.set(
-        f"{model_name}_cached", pickle.dumps(serialize(model)), datetime.timedelta(seconds=reset_sec)
+            f"{model_name}_cached",
+            pickle.dumps(serialize(model)),
+            datetime.timedelta(seconds=reset_sec),
         )
 
     def sync_pred_ts(time_series):
@@ -237,7 +232,7 @@ async def predict_temperature(time_series: List[float]):
         # )
 
         return {"result": result.tolist(), "error": None}
-    
+
     try:
         result = await run_in_threadpool(sync_pred_ts, time_series)
         return result
@@ -249,6 +244,8 @@ async def predict_temperature(time_series: List[float]):
 
 lock = asyncio.Lock()
 atmos_model_cache = VarTimer()
+
+
 @router.put("/atmos_timer")
 async def predict_temperature_(time_series: List[float]):
     """
@@ -272,13 +269,12 @@ async def predict_temperature_(time_series: List[float]):
             if not atmos_model_cache.is_var:
                 run_id = engine.execute(
                     SELECT_BEST_MODEL.format(model_name)
-                ).fetchone()[0]  
+                ).fetchone()[0]
                 print("start load model from mlflow")
                 atmos_model_cache.cache_var(
                     mlflow.keras.load_model(f"runs:/{run_id}/model")
-                    )
+                )
                 print("end load model from mlflow")
-    
 
     def sync_pred_ts(time_series):
         """
@@ -293,7 +289,6 @@ async def predict_temperature_(time_series: List[float]):
         )
 
         return {"result": result.tolist(), "error": None}
-
 
     try:
         result = await run_in_threadpool(sync_pred_ts, time_series)

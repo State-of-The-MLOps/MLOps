@@ -1,20 +1,22 @@
 import codecs
 import glob
 import io
-import threading
 import os
 import pickle
 import re
 import shutil
 import socketserver
 import subprocess
+import threading
 import time
 import zipfile
 from io import StringIO
 
+import mlflow
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+import torch
 import yaml
 from dotenv import load_dotenv
 from google.cloud import storage
@@ -571,15 +573,13 @@ class VarTimer:
         self._caching_time = caching_time
         self._reset_flag = False
 
-
-    def cache_var(self, model, caching_time=False):
+    def cache_var(self, var, caching_time=False):
         if caching_time:
             self._change_timedelta(caching_time)
-        self._var = model
+        self._var = var
         self._reset_flag = True
         cleaner = threading.Thread(target=self._value_cleaner)
         cleaner.start()
-
 
     def _value_cleaner(self):
         while self._reset_flag:
@@ -587,27 +587,72 @@ class VarTimer:
             time.sleep(self._caching_time)
         self._var = None
 
-
     def get_var(self):
         self._reset_flag = True
         return self._var
-
 
     def reset_timer(self, caching_time=False):
         if caching_time:
             self._change_timedelta(caching_time)
         self._reset_flag = True
 
-
     def _change_timedelta(self, caching_time):
-        if not (isinstance(caching_time, int)|
-                isinstance(caching_time, float)):
+        if not (
+            isinstance(caching_time, int) | isinstance(caching_time, float)
+        ):
 
-                print((f"timedelta must be int or float! "
-                       f"\"{caching_time}\"(type {type(caching_time)}) isn't applied"))
+            print(
+                (
+                    f"timedelta must be int or float! "
+                    f'"{caching_time}"(type {type(caching_time)}) isn\'t applied'
+                )
+            )
         else:
             self._caching_time = caching_time
 
     @property
     def is_var(self):
         return True if self._var else False
+
+
+class CachingModel(VarTimer):
+    def __init__(self, model_type, caching_time=5):
+        super().__init__(caching_time)
+        self._run_id = None
+        self._model_type = model_type
+
+    def _load_run_id(self, model_name):
+        self._run_id = engine.execute(
+            SELECT_BEST_MODEL.format(model_name)
+        ).fetchone()[0]
+
+    def _load_model_mlflow(self):
+        model = None
+        if self._model_type == "keras":
+            model = mlflow.keras.load_model(f"runs:/{self._run_id}/model")
+        elif self._model_type == "pytorch":
+            model = mlflow.pytorch.load_model(f"runs:/{self._run_id}/model")
+        elif self._model_type == "sklearn":
+            model = mlflow.sklearn.load_model(f"runs:/{self._run_id}/model")
+        else:
+            print("Only keras, torch, sklearn is allowed")
+
+        return model
+
+    def get_model(self, model_name):
+        if not super().is_var:
+            self._load_run_id(model_name)
+            super().cache_var(self._load_model_mlflow())
+        else:
+            super().reset_timer()
+
+    def predict(self, data, cut=False):
+        if self._model_type == "pytorch":
+            if cut:
+                return torch.nn.Sequential(
+                    *list(self._var.children())[:-1]
+                ).forward(data)
+            else:
+                return self._var.forward(data)
+        else:
+            return self._var.predict(data)
