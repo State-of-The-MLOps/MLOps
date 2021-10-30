@@ -78,25 +78,33 @@ def predict_insurance(
     return result
 
 
-mnist_lock, knn_lock = asyncio.Lock(), asyncio.Lock()
 mnist_model = CachingModel("pytorch", 30)
 knn_model = CachingModel("sklearn", 30)
-data1_lock, data2_lock = asyncio.Lock(), asyncio.Lock()  # 임시
-sample_df, train_df = VarTimer(), VarTimer()  # 임시
+data_lock = asyncio.Lock()  # 임시
+sample_df, train_df = VarTimer(600), VarTimer(600)  # 임시
 
 
 @router.put("/mnist")
 async def predict_mnist(num=1):
 
-    global mnist_lock, knn_lock, sample_df, train_df
+    global sample_df, train_df
     global mnist_model, knn_model
     model_name = "mnist"
     model_name2 = "mnist_knn"
 
     # temp process
-    if not isinstance(sample_df, pd.DataFrame):
-        sample_df = load_data_cloud(CLOUD_STORAGE_NAME, CLOUD_VALID_MNIST)
-    sample_row = sample_df.iloc[int(num), 1:].values.astype(np.uint8)
+
+    if not isinstance(sample_df._var, pd.DataFrame):
+        async with data_lock:
+            if not isinstance(sample_df._var, pd.DataFrame):
+                sample_df.cache_var(
+                    load_data_cloud(CLOUD_STORAGE_NAME, CLOUD_VALID_MNIST)
+                )
+                train_df.cache_var(
+                    load_data_cloud(CLOUD_STORAGE_NAME, CLOUD_TRAIN_MNIST)
+                )
+
+    sample_row = sample_df.get_var().iloc[int(num), 1:].values.astype(np.uint8)
     transform = transforms.Compose(
         [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
     )
@@ -116,13 +124,10 @@ async def predict_mnist(num=1):
     result = mnist_model.predict(sample, True)
     result = result.detach().numpy()
 
+    # KNN
     knn_result = knn_model.predict(result)
 
-    # KNN
-    if not isinstance(train_df, pd.DataFrame):
-        train_df = load_data_cloud(CLOUD_STORAGE_NAME, CLOUD_TRAIN_MNIST)
-
-    xai_result = train_df.iloc[knn_result, 1:].values[0].tolist()
+    xai_result = train_df.get_var().iloc[knn_result, 1:].values[0].tolist()
 
     return percentage, percentage.index(max(percentage)), xai_result
 

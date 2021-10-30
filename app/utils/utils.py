@@ -1,3 +1,4 @@
+import asyncio
 import codecs
 import glob
 import io
@@ -620,6 +621,7 @@ class CachingModel(VarTimer):
         super().__init__(caching_time)
         self._run_id = None
         self._model_type = model_type
+        self._lock = asyncio.Lock()
 
     def _load_run_id(self, model_name):
         self._run_id = engine.execute(
@@ -639,10 +641,12 @@ class CachingModel(VarTimer):
 
         return model
 
-    def get_model(self, model_name):
+    async def get_model(self, model_name):
         if not super().is_var:
-            self._load_run_id(model_name)
-            super().cache_var(self._load_model_mlflow())
+            async with self._lock:
+                if not super().is_var:
+                    self._load_run_id(model_name)
+                    super().cache_var(self._load_model_mlflow())
         else:
             super().reset_timer()
 
