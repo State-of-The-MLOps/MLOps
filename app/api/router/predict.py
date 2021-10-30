@@ -1,23 +1,19 @@
 # -*- coding: utf-8 -*-
 import asyncio
 import datetime
-import io
 import os
 import pickle
-import time
 from typing import List
 
 import mlflow
 import numpy as np
 import pandas as pd
 import redis
-import torch
 import torchvision.transforms as transforms
 import xgboost as xgb
 from dotenv import load_dotenv
 from fastapi import APIRouter
 from starlette.concurrency import run_in_threadpool
-from tensorflow.keras.layers import deserialize, serialize
 
 from app import schema
 from app.api.data_class import ModelCorePrediction
@@ -36,9 +32,6 @@ load_dotenv()
 
 schema.Base.metadata.create_all(bind=engine)
 
-pool = redis.ConnectionPool(host="localhost", port=6379, db=0)
-client = redis.Redis(connection_pool=pool)
-
 host_url = os.getenv("MLFLOW_HOST")
 mlflow.set_tracking_uri(host_url)
 reset_sec = 5
@@ -51,31 +44,6 @@ router = APIRouter(
     tags=["predict"],
     responses={404: {"description": "Not Found"}},
 )
-
-
-@router.put("/insurance")
-def predict_insurance(
-    info: ModelCorePrediction, model_name: str = "insurance"
-):
-    info = info.dict()
-    test_set = xgb.DMatrix(np.array([*info.values()]).reshape(1, -1))
-
-    model = client.get("redis_model")
-
-    if model:
-        model = pickle.loads(model)
-        client.expire("redis_model", reset_sec)
-    else:
-        run_id = engine.execute(
-            SELECT_BEST_MODEL.format(model_name)
-        ).fetchone()[0]
-        model = mlflow.xgboost.load_model(f"runs:/{run_id}/model")
-        client.set(
-            "redis_model", pickle.dumps(model), datetime.timedelta(seconds=5)
-        )
-
-    result = float(model.predict(test_set)[0])
-    return result
 
 
 mnist_model = CachingModel("pytorch", 30)
@@ -97,6 +65,7 @@ async def predict_mnist(num=1):
     if not isinstance(sample_df._var, pd.DataFrame):
         async with data_lock:
             if not isinstance(sample_df._var, pd.DataFrame):
+                print(CLOUD_STORAGE_NAME, CLOUD_VALID_MNIST)
                 sample_df.cache_var(
                     load_data_cloud(CLOUD_STORAGE_NAME, CLOUD_VALID_MNIST)
                 )
@@ -112,8 +81,8 @@ async def predict_mnist(num=1):
     sample = transform(aa)
     sample = sample.view(1, 1, 28, 28)
 
-    mnist_model.get_model(model_name)
-    knn_model.get_model(model_name2)
+    await mnist_model.get_model(model_name)
+    await knn_model.get_model(model_name2)
 
     # Net1
     result = mnist_model.predict(sample)

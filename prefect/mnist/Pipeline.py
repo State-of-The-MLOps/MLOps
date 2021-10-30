@@ -42,7 +42,7 @@ class Pipeline:
 
             """
 
-            host_url = Parameter("host_url", "http://localhost:5001")
+            host_url = Parameter("host_url", "http://localhost:5000")
             exp_name = Parameter("exp_name", "mnist")
             metric = Parameter("metric", "loss")
             num_samples = Parameter("num_samples", 1)
