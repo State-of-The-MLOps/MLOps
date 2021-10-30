@@ -10,14 +10,20 @@ import socketserver
 import subprocess
 import time
 import zipfile
+from io import StringIO
 
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 import yaml
+from dotenv import load_dotenv
+from google.cloud import storage
 
 from app.database import engine
 from app.query import *
 from logger import L
+
+load_dotenv()
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
@@ -32,6 +38,21 @@ def softmax(x):
 
     f_x = np.exp(x) / np.sum(np.exp(x))
     return f_x
+
+
+def load_data_cloud(bucket_name, data_path):
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(bucket_name)
+    blob = bucket.blob(data_path)
+
+    bytes_data = blob.download_as_bytes()
+
+    s = str(bytes_data, "utf-8")
+
+    data = StringIO(s)
+    df = pd.read_csv(data)
+
+    return df
 
 
 class CoreModel:
