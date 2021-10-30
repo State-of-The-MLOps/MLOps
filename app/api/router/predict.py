@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
+import asyncio
 import datetime
 import io
 import os
 import pickle
+import time
 from typing import List
 
 import mlflow
@@ -21,7 +23,13 @@ from app import schema
 from app.api.data_class import ModelCorePrediction
 from app.database import engine
 from app.query import SELECT_BEST_MODEL
-from app.utils import ScikitLearnModel, load_data_cloud, softmax
+from app.utils import (
+    CachingModel,
+    ScikitLearnModel,
+    VarTimer,
+    load_data_cloud,
+    softmax,
+)
 from logger import L
 
 load_dotenv()
@@ -70,64 +78,56 @@ def predict_insurance(
     return result
 
 
+mnist_model = CachingModel("pytorch", 30)
+knn_model = CachingModel("sklearn", 30)
+data_lock = asyncio.Lock()  # 임시
+sample_df, train_df = VarTimer(600), VarTimer(600)  # 임시
+
+
 @router.put("/mnist")
-def predict_mnist(num=1):
+async def predict_mnist(num=1):
+
+    global sample_df, train_df
+    global mnist_model, knn_model
     model_name = "mnist"
     model_name2 = "mnist_knn"
 
-    Net1 = client.get(f"{model_name}_cached")
-    knn_model = client.get(f"{model_name2}_cached")
-    if Net1:
-        stream = io.BytesIO(Net1)  # implements seek()
-        Net1 = torch.load(stream)
-    else:
-        run_id = engine.execute(
-            SELECT_BEST_MODEL.format(model_name)
-        ).fetchone()[0]
-        Net1 = mlflow.pytorch.load_model(f"runs:/{run_id}/model")
-        client.set(
-            f"{model_name}_cached",
-            Net1.save_to_buffer(),
-            datetime.timedelta(seconds=40),
-        )
+    # temp process
 
-    if knn_model:
-        knn_model = pickle.loads(knn_model)
-    else:
-        run_id2 = engine.execute(
-            SELECT_BEST_MODEL.format(model_name2)
-        ).fetchone()[0]
-        knn_model = mlflow.sklearn.load_model(f"runs:/{run_id2}/model")
-        client.set(
-            f"{model_name2}_cached",
-            pickle.dumps(knn_model),
-            datetime.timedelta(seconds=40),
-        )
+    if not isinstance(sample_df._var, pd.DataFrame):
+        async with data_lock:
+            if not isinstance(sample_df._var, pd.DataFrame):
+                sample_df.cache_var(
+                    load_data_cloud(CLOUD_STORAGE_NAME, CLOUD_VALID_MNIST)
+                )
+                train_df.cache_var(
+                    load_data_cloud(CLOUD_STORAGE_NAME, CLOUD_TRAIN_MNIST)
+                )
 
-    # Net1
-    sample_df = load_data_cloud(CLOUD_STORAGE_NAME, CLOUD_VALID_MNIST)
-    sample_row = sample_df.iloc[int(num), 1:].values.astype(np.uint8)
+    sample_row = sample_df.get_var().iloc[int(num), 1:].values.astype(np.uint8)
     transform = transforms.Compose(
         [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
     )
     aa = sample_row.reshape(28, 28)
     sample = transform(aa)
-
     sample = sample.view(1, 1, 28, 28)
-    result = Net1.forward(sample)
 
+    mnist_model.get_model(model_name)
+    knn_model.get_model(model_name2)
+
+    # Net1
+    result = mnist_model.predict(sample)
     p_res = softmax(result.detach().numpy()) * 100
     percentage = np.around(p_res[0], 2).tolist()
 
     # Net2
-    Net2 = torch.nn.Sequential(*list(Net1.children())[:-1])
-    result = Net2.forward(sample)
+    result = mnist_model.predict(sample, True)
     result = result.detach().numpy()
 
     # KNN
     knn_result = knn_model.predict(result)
-    df2 = load_data_cloud(CLOUD_STORAGE_NAME, CLOUD_TRAIN_MNIST)
-    xai_result = df2.iloc[knn_result, 1:].values[0].tolist()
+
+    xai_result = train_df.get_var().iloc[knn_result, 1:].values[0].tolist()
 
     return percentage, percentage.index(max(percentage)), xai_result
 
@@ -169,41 +169,39 @@ async def predict_insurance(info: ModelCorePrediction, model_name: str):
         return {"result": "Can't predict", "error": str(e)}
 
 
-@router.put("/atmos")
-async def predict_temperature(time_series: List[float]):
+lock = asyncio.Lock()
+atmos_model_cache = VarTimer()
+
+
+@router.put("/atmos_timer")
+async def predict_temperature_(time_series: List[float]):
     """
     온도 1시간 간격 시계열을 입력받아 이후 24시간 동안의 온도를 1시간 간격의 시계열로 예측합니다.
-
     Args:
         time_series(List): 72시간 동안의 1시간 간격 온도 시계열 입니다. 72개의 원소를 가져야 합니다.
-
     Returns:
         List[float]: 입력받은 시간 이후 24시간 동안의 1시간 간격 온도 예측 시계열 입니다.
     """
+
+    global lock
 
     if len(time_series) != 72:
         L.error(f"input time_series: {time_series} is not valid")
         return {"result": "time series must have 72 values", "error": None}
 
     model_name = "atmos_tmp"
-    model = client.get(f"{model_name}_cached")
-    if model:
-        print("predict cached model")
-        model = deserialize(pickle.loads(model))
-        client.expire(f"{model_name}_cached", reset_sec)
 
-    else:
-        run_id = engine.execute(
-            SELECT_BEST_MODEL.format(model_name)
-        ).fetchone()[0]
-        print("start load model from mlflow")
-        model = mlflow.keras.load_model(f"runs:/{run_id}/model")
-        print("end load model from mlflow")
-        client.set(
-            f"{model_name}_cached",
-            pickle.dumps(serialize(model)),
-            datetime.timedelta(seconds=reset_sec),
-        )
+    if not atmos_model_cache.is_var:
+        async with lock:
+            if not atmos_model_cache.is_var:
+                run_id = engine.execute(
+                    SELECT_BEST_MODEL.format(model_name)
+                ).fetchone()[0]
+                print("start load model from mlflow")
+                atmos_model_cache.cache_var(
+                    mlflow.keras.load_model(f"runs:/{run_id}/model")
+                )
+                print("end load model from mlflow")
 
     def sync_pred_ts(time_series):
         """
@@ -211,7 +209,8 @@ async def predict_temperature(time_series: List[float]):
         """
 
         time_series = np.array(time_series).reshape(1, 72, 1)
-        result = model.predict(time_series)
+        result = atmos_model_cache.get_var().predict(time_series)
+        atmos_model_cache.reset_timer()
         L.info(
             f"Predict Args info: {time_series.flatten().tolist()}\n\tmodel_name: {model_name}\n\tPrediction Result: {result.tolist()[0]}"
         )
