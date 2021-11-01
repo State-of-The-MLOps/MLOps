@@ -9,6 +9,7 @@ from task import (
 
 import prefect
 from prefect import Flow, Parameter, case
+from prefect.run_configs import LocalRun
 
 
 class Pipeline:
@@ -60,7 +61,7 @@ class Pipeline:
 
             with case(is_end, False):
                 case2()
-
+        flow.run_config = LocalRun(working_dir="/MLOps/prefect/mnist")
         self._flow = flow
         self._register()
 
