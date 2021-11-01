@@ -5,6 +5,7 @@ from prefect import Flow
 from task import *
 from prefect.schedules import Schedule
 from prefect.schedules.clocks import CronClock
+from prefect.run_configs import LocalRun
 
 
 class atmos_ETL:
@@ -45,6 +46,7 @@ class atmos_ETL:
                                       num_trials)
             log_best_model(is_end, host_url, exp_name, metric, model_type)
 
+        flow.run_config = LocalRun(working_dir="/MLOps/prefect/atmos_tmp_pipeline")
         self._flow = flow
         self._register()
         
