@@ -1,4 +1,5 @@
 from mlflow.entities import experiment
+from prefect.run_configs.local import LocalRun
 from prefect.schedules.schedules import CronSchedule
 from task import etl, log_best_model, train_mlflow_ray
 
@@ -53,7 +54,7 @@ class Pipeline:
 
             if is_end:
                 log_best_model(is_end, host_url, exp_name, metric, model_type)
-
+        flow.run_config = LocalRun(working_dir="/MLOps/prefect/insurance")
         self._flow = flow
         self._register()
 
