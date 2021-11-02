@@ -38,7 +38,7 @@ def connect(db):
 POSTGRES_DB = os.getenv("POSTGRES_DB")
 engine = connect(POSTGRES_DB)
 
-# print(df)
+
 class MnistNet(torch.nn.Module):
     def __init__(self, l1):
         super(MnistNet, self).__init__()
@@ -115,12 +115,43 @@ def save_best_model(
                 run_id, model_type, metric, metric_score, model_name
             )
         )
-    else:  # 생성
+    else:
         engine.execute(
             INSERT_BEST_MODEL.format(
                 model_name, run_id, model_type, metric, metric_score
             )
         )
+
+
+def load_data_cloud(bucket_name, data_path):
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(bucket_name)
+    blob = bucket.blob(data_path)
+
+    bytes_data = blob.download_as_bytes()
+
+    s = str(bytes_data, "utf-8")
+
+    data = StringIO(s)
+    df = pd.read_csv(data)
+
+    return df
+
+
+def load_data(is_cloud):
+    if is_cloud:
+        CLOUD_STORAGE_NAME = os.getenv("CLOUD_STORAGE_NAME")
+        CLOUD_TRAIN_MNIST = os.getenv("CLOUD_TRAIN_MNIST")
+        CLOUD_VALID_MNIST = os.getenv("CLOUD_VALID_MNIST")
+        train_df = load_data_cloud(CLOUD_STORAGE_NAME, CLOUD_TRAIN_MNIST)
+        valid_df = load_data_cloud(CLOUD_STORAGE_NAME, CLOUD_VALID_MNIST)
+    else:
+        TRAIN_MNIST = os.getenv("TRAIN_MNIST")
+        VALID_MNIST = os.getenv("VALID_MNIST")
+        train_df = pd.read_csv(TRAIN_MNIST)
+        valid_df = pd.read_csv(VALID_MNIST)
+
+    return train_df, valid_df
 
 
 def cnn_training(config, checkpoint_dir=None, is_cloud=True):
@@ -157,34 +188,37 @@ def cnn_training(config, checkpoint_dir=None, is_cloud=True):
         running_loss = 0.0
         epoch_steps = 0
         for i, data in enumerate(train_loader, 0):
-            # get the inputs; data is a list of [inputs, labels]
             inputs, labels = data
             inputs, labels = inputs.to(device), labels.to(device)
 
-            # zero the parameter gradients
             optimizer.zero_grad()
 
-            # forward + backward + optimize
             outputs = Net(inputs)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
 
-            # print statistics
             running_loss += loss.item()
             epoch_steps += 1
-            if i % 2000 == 1999:  # print every 2000 mini-batches
+            if i % 2000 == 1999:
                 print(
                     "[%d, %5d] loss: %.3f"
                     % (epoch + 1, i + 1, running_loss / epoch_steps)
                 )
                 running_loss = 0.0
 
-        # Validation loss
         val_loss = 0.0
         val_steps = 0
         total = 0
         correct = 0
+
+        classes = ("0", "1", "2", "3", "4", "5", "6", "7", "8", "9")
+        correct_pred = {classname: 0 for classname in classes}
+        total_pred = {classname: 0 for classname in classes}
+        result_pred = {
+            f"{classname}_acc_percentage": 0 for classname in classes
+        }
+
         for i, data in enumerate(valid_loader, 0):
             with torch.no_grad():
                 inputs, labels = data
@@ -199,11 +233,26 @@ def cnn_training(config, checkpoint_dir=None, is_cloud=True):
                 val_loss += loss.cpu().numpy()
                 val_steps += 1
 
+                for label, prediction in zip(labels, predicted):
+                    if label == prediction:
+                        correct_pred[classes[label]] += 1
+                    total_pred[classes[label]] += 1
+
         with tune.checkpoint_dir(epoch) as checkpoint_dir:
             path = os.path.join(checkpoint_dir, "checkpoint")
             torch.save((Net.state_dict(), optimizer.state_dict()), path)
 
-        tune.report(loss=(val_loss / val_steps), accuracy=correct / total)
+        for classname, correct_count in correct_pred.items():
+            accuracy = round(
+                100 * float(correct_count) / total_pred[classname], 2
+            )
+            result_pred[f"{classname}_acc_percentage"] = accuracy
+
+        tune.report(
+            loss=(val_loss / val_steps),
+            accuracy=correct / total,
+            result_pred=result_pred,
+        )
 
 
 def preprocess_train(train_df, valid_df, batch_size):
@@ -217,34 +266,3 @@ def preprocess_train(train_df, valid_df, batch_size):
     total_batch = len(train_loader)
 
     return (train_loader, valid_loader, total_batch)
-
-
-def load_data(is_cloud):
-    if is_cloud:
-        CLOUD_STORAGE_NAME = os.getenv("CLOUD_STORAGE_NAME")
-        CLOUD_TRAIN_MNIST = os.getenv("CLOUD_TRAIN_MNIST")
-        CLOUD_VALID_MNIST = os.getenv("CLOUD_VALID_MNIST")
-        train_df = load_data_cloud(CLOUD_STORAGE_NAME, CLOUD_TRAIN_MNIST)
-        valid_df = load_data_cloud(CLOUD_STORAGE_NAME, CLOUD_VALID_MNIST)
-    else:
-        TRAIN_MNIST = os.getenv("TRAIN_MNIST")
-        VALID_MNIST = os.getenv("VALID_MNIST")
-        train_df = pd.read_csv(TRAIN_MNIST)
-        valid_df = pd.read_csv(VALID_MNIST)
-
-    return train_df, valid_df
-
-
-def load_data_cloud(bucket_name, data_path):
-    storage_client = storage.Client()
-    bucket = storage_client.bucket(bucket_name)
-    blob = bucket.blob(data_path)
-
-    bytes_data = blob.download_as_bytes()
-
-    s = str(bytes_data, "utf-8")
-
-    data = StringIO(s)
-    df = pd.read_csv(data)
-
-    return df
