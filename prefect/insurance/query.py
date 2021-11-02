@@ -1,7 +1,7 @@
 INSERT_BEST_MODEL = """
         INSERT INTO best_model_data (
             model_name,
-            artifact_uri,
+            run_id,
             model_type,
             metric,
             metric_score
@@ -23,7 +23,7 @@ SELECT_EXIST_MODEL = """
 UPDATE_BEST_MODEL = """
         UPDATE best_model_data
         SET
-            artifact_uri = '{}',
+            run_id = '{}',
             model_type = '{}',
             metric = '{}',
             metric_score = {}
