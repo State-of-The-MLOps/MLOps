@@ -101,6 +101,22 @@ async def predict_mnist(num=1):
     return percentage, percentage.index(max(percentage)), xai_result
 
 
+insurance_model = CachingModel("xgboost", 30)
+
+
+@router.put("/insurance2")
+async def predict_insurance(info: ModelCorePrediction):
+    info = info.dict()
+    test_set = xgb.DMatrix(np.array([*info.values()]).reshape(1, -1))
+
+    model_name = "insurance"
+    await insurance_model.get_model(model_name)
+    result = insurance_model.predict(test_set)
+
+    result = float(result[0])
+    return result
+
+
 @router.put("/insurance")
 async def predict_insurance(info: ModelCorePrediction, model_name: str):
     """
