@@ -26,6 +26,7 @@ from prefect import task
 
 load_dotenv()
 
+
 @task
 def tune_cnn(num_samples, max_num_epochs, is_cloud):
 
@@ -45,7 +46,6 @@ def tune_cnn(num_samples, max_num_epochs, is_cloud):
 
     result = tune.run(
         partial(cnn_training, is_cloud=is_cloud),
-        resources_per_trial={"cpu": 2},
         config=config,
         num_samples=num_samples,
         scheduler=scheduler,

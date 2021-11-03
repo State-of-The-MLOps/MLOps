@@ -1,3 +1,4 @@
+from prefect.run_configs import LocalRun
 from prefect.schedules.schedules import CronSchedule
 from task import (
     case2,
@@ -9,7 +10,6 @@ from task import (
 
 import prefect
 from prefect import Flow, Parameter, case
-from prefect.run_configs import LocalRun
 
 
 class Pipeline:
@@ -43,7 +43,7 @@ class Pipeline:
 
             """
 
-            host_url = Parameter("host_url", "http://localhost:5000")
+            host_url = Parameter("host_url", "http://mlflow-server:5000")
             exp_name = Parameter("exp_name", "mnist")
             metric = Parameter("metric", "loss")
             num_samples = Parameter("num_samples", 1)
