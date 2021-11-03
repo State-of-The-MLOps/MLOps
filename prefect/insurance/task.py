@@ -175,7 +175,7 @@ def save_best_model(run_id, model_type, metric, metric_score, model_name):
         )
 
 
-# @task(nout=2)
+@task(nout=2)
 def etl(query):
     etl = ETL(query)
 
@@ -187,7 +187,7 @@ def etl(query):
     return X, y
 
 
-# @task
+@task
 def train_mlflow_ray(X, y, host_url, exp_name, metric, num_trials):
     mlflow.set_tracking_uri(host_url)
     mlflow.set_experiment(exp_name)
@@ -200,7 +200,7 @@ def train_mlflow_ray(X, y, host_url, exp_name, metric, num_trials):
     return True
 
 
-# @task
+@task
 def log_best_model(is_end, host_url, exp_name, metric, model_type):
     mlflow.set_tracking_uri(host_url)
 
@@ -221,16 +221,16 @@ def log_best_model(is_end, host_url, exp_name, metric, model_type):
     )
 
 
-if __name__ == "__main__":
-    extract_query = "SELECT * FROM insurance"
-    host_url = "http://localhost:5001"
-    exp_name = "insurance"
-    metric = "mae"
-    model_type = "xgboost"
-    num_trials = 1
+# if __name__ == "__main__":
+#     extract_query = "SELECT * FROM insurance"
+#     host_url = "http://localhost:5001"
+#     exp_name = "insurance"
+#     metric = "mae"
+#     model_type = "xgboost"
+#     num_trials = 1
 
-    X, y = etl(extract_query)
-    is_end = train_mlflow_ray(X, y, host_url, exp_name, metric, num_trials)
+#     X, y = etl(extract_query)
+#     is_end = train_mlflow_ray(X, y, host_url, exp_name, metric, num_trials)
 
-    if is_end:
-        log_best_model(is_end, host_url, exp_name, metric, model_type)
+#     if is_end:
+#         log_best_model(is_end, host_url, exp_name, metric, model_type)
