@@ -154,9 +154,7 @@ class InsuranceTuner(Tuner):
         )
 
 
-def save_best_model(
-    artifact_uri, model_type, metric, metric_score, model_name
-):
+def save_best_model(run_id, model_type, metric, metric_score, model_name):
 
     exist_model = engine.execute(
         SELECT_EXIST_MODEL.format(model_name)
@@ -166,13 +164,13 @@ def save_best_model(
     if exist_model and exist_model.metric_score >= metric_score:
         engine.execute(
             UPDATE_BEST_MODEL.format(
-                artifact_uri, model_type, metric, metric_score, model_name
+                run_id, model_type, metric, metric_score, model_name
             )
         )
     else:  # 생성
         engine.execute(
             INSERT_BEST_MODEL.format(
-                model_name, artifact_uri, model_type, metric, metric_score
+                model_name, run_id, model_type, metric, metric_score
             )
         )
 
@@ -212,16 +210,10 @@ def log_best_model(is_end, host_url, exp_name, metric, model_type):
 
     best_score = runs["metrics.mae"].min()
     best_run = runs[runs["metrics.mae"] == best_score]
-    run_data = mlflow.get_run(best_run.run_id.item()).data
-    history = eval(run_data.tags["mlflow.log-model.history"])
-
-    artifact_uri = best_run["artifact_uri"].item()
-    artifact_path = history[0]["artifact_path"]
-
-    artifact_uri = artifact_uri + f"/{artifact_path}"
+    run_id = best_run.run_id.item()
 
     save_best_model(
-        artifact_uri,
+        run_id,
         model_type,
         metric,
         metric_score=best_score,
@@ -229,12 +221,12 @@ def log_best_model(is_end, host_url, exp_name, metric, model_type):
     )
 
 
-# if __name__ == '__main__':
-#     extract_query = 'SELECT * FROM insurance'
-#     host_url =  'http://localhost:5001'
-#     exp_name =  'insurance'
-#     metric =  'mae'
-#     model_type = 'xgboost'
+# if __name__ == "__main__":
+#     extract_query = "SELECT * FROM insurance"
+#     host_url = "http://localhost:5001"
+#     exp_name = "insurance"
+#     metric = "mae"
+#     model_type = "xgboost"
 #     num_trials = 1
 
 #     X, y = etl(extract_query)

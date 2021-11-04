@@ -636,6 +636,8 @@ class CachingModel(VarTimer):
             model = mlflow.pytorch.load_model(f"runs:/{self._run_id}/model")
         elif self._model_type == "sklearn":
             model = mlflow.sklearn.load_model(f"runs:/{self._run_id}/model")
+        elif self._model_type == "xgboost":
+            model = mlflow.xgboost.load_model(f"runs:/{self._run_id}/model")
         else:
             print("Only keras, torch, sklearn is allowed")
 
