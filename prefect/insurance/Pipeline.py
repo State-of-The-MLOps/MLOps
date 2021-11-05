@@ -55,7 +55,9 @@ class Pipeline:
 
             if is_end:
                 log_best_model(is_end, host_url, exp_name, metric, model_type)
+                
         flow.run_config = LocalRun(working_dir="prefect/insurance")
+
         self._flow = flow
         self._register()
 
