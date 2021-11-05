@@ -1,4 +1,5 @@
 from mlflow.entities import experiment
+from prefect.run_configs.local import LocalRun
 from prefect.schedules.schedules import CronSchedule
 from task import etl, log_best_model, train_mlflow_ray
 
@@ -39,7 +40,8 @@ class Pipeline:
             extract_query = Parameter(
                 "extract_query", "SELECT * FROM insurance"
             )
-            host_url = Parameter("host_url", "http://localhost:5001")
+
+            host_url = Parameter("host_url", "http://mlflow-server:5000")
             exp_name = Parameter("exp_name", "insurance")
             metric = Parameter("metric", "mae")
             model_type = Parameter("model_type", "xgboost")
@@ -53,7 +55,7 @@ class Pipeline:
 
             if is_end:
                 log_best_model(is_end, host_url, exp_name, metric, model_type)
-
+        flow.run_config = LocalRun(working_dir="prefect/insurance")
         self._flow = flow
         self._register()
 

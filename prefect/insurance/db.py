@@ -1,18 +1,23 @@
 import pandas as pd
 import sqlalchemy
-from sqlalchemy import create_engine
+import os
 
-engine = create_engine(
-    "postgresql://ehddnr:0000@localhost:5431/ehddnr"
-)  # set yours
 
-table_check = engine.execute(
-    "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';"
-).fetchall()
-table_list = [list(dict(r).values())[0] for r in table_check]
+def connect(db):
+    """Returns a connection and a metadata object"""
 
-# 임시적으로 추가한 부분으로 추후 삭제
-if "insurance" not in table_list:
-    print("make insurance table")
-    ins = pd.read_csv("./insurance.csv")
-    ins.to_sql("insurance", engine, index=False)
+    POSTGRES_USER = os.getenv("POSTGRES_USER")
+    POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
+    POSTGRES_SERVER = os.getenv("POSTGRES_SERVER")
+    POSTGRES_PORT = os.getenv("POSTGRES_PORT")
+    POSTGRES_DB = db
+
+    url = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_SERVER}:{POSTGRES_PORT}/{POSTGRES_DB}"
+
+    connection = sqlalchemy.create_engine(url)
+
+    return connection
+
+
+POSTGRES_DB = os.getenv("POSTGRES_DB")
+engine = connect(POSTGRES_DB)
