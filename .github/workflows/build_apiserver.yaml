@@ -2,9 +2,6 @@ name: Build API server container
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches:
-      - main
 
 jobs:
   build:
