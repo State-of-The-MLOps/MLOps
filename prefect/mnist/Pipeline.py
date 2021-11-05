@@ -61,7 +61,7 @@ class Pipeline:
 
             with case(is_end, False):
                 case2()
-        flow.run_config = LocalRun(working_dir="/MLOps/prefect/mnist")
+        flow.run_config = LocalRun(working_dir="prefect/mnist")
         self._flow = flow
         self._register()
 

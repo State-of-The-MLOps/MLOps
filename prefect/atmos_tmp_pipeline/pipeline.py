@@ -1,6 +1,4 @@
 import prefect
-import pandas as pd
-from datetime import timedelta
 from prefect import Flow
 from task import *
 from prefect.schedules import Schedule
@@ -46,7 +44,7 @@ class atmos_ETL:
                                       num_trials)
             log_best_model(is_end, host_url, exp_name, metric, model_type)
 
-        flow.run_config = LocalRun(working_dir="/MLOps/prefect/atmos_tmp_pipeline")
+        flow.run_config = LocalRun(working_dir="prefect/atmos_tmp_pipeline")
         self._flow = flow
         self._register()
         

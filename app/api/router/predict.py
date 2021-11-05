@@ -1,14 +1,11 @@
 # -*- coding: utf-8 -*-
 import asyncio
-import datetime
 import os
-import pickle
 from typing import List
 
 import mlflow
 import numpy as np
 import pandas as pd
-import redis
 import torchvision.transforms as transforms
 import xgboost as xgb
 from dotenv import load_dotenv
@@ -158,7 +155,7 @@ lock = asyncio.Lock()
 atmos_model_cache = VarTimer()
 
 
-@router.put("/atmos_timer")
+@router.put("/atmos_temperature")
 async def predict_temperature_(time_series: List[float]):
     """
     온도 1시간 간격 시계열을 입력받아 이후 24시간 동안의 온도를 1시간 간격의 시계열로 예측합니다.
