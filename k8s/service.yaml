@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlops-service
+spec:
+  ports:
+    - name: web-port
+      port: 8000
+      targetPort: 8000
+      nodePort: 32105
+  selector:
+    app: api-server
+  type: NodePort
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlflow-service
+spec:
+  ports:
+    - name: mlflow-port
+      port: 5000
+      targetPort: 5000
+      nodePort: 32205
+  selector:
+    app: mlflow-server
+  type: NodePort
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pgdb
+spec:
+  ports:
+    - name: db-port
+      port: 5432
+      targetPort: 5432
+  selector:
+    app: postgres-server
+  type: ClusterIP

@@ -43,7 +43,7 @@ class Pipeline:
 
             """
 
-            host_url = Parameter("host_url", "http://mlflow-server:5000")
+            host_url = Parameter("host_url", "http://mlflow-service:5000")
             exp_name = Parameter("exp_name", "mnist")
             metric = Parameter("metric", "loss")
             num_samples = Parameter("num_samples", 1)

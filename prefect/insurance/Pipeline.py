@@ -41,7 +41,7 @@ class Pipeline:
                 "extract_query", "SELECT * FROM insurance"
             )
 
-            host_url = Parameter("host_url", "http://mlflow-server:5000")
+            host_url = Parameter("host_url", "http://mlflow-service:5000")
             exp_name = Parameter("exp_name", "insurance")
             metric = Parameter("metric", "mae")
             model_type = Parameter("model_type", "xgboost")
