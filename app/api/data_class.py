@@ -29,3 +29,7 @@ class ModelCorePrediction(BaseModel):
 class ModelCore(ModelCoreBase):
     class Config:
         orm_mode = True
+
+
+class MnistData(BaseModel):
+    mnist_num: str

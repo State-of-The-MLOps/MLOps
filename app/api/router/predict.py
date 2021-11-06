@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import ast
 import asyncio
 import os
 from typing import List
@@ -13,7 +14,7 @@ from fastapi import APIRouter
 from starlette.concurrency import run_in_threadpool
 
 from app import schema
-from app.api.data_class import ModelCorePrediction
+from app.api.data_class import MnistData, ModelCorePrediction
 from app.database import engine
 from app.query import SELECT_BEST_MODEL
 from app.utils import (
@@ -43,59 +44,67 @@ router = APIRouter(
 )
 
 
-mnist_model = CachingModel("pytorch", 30)
-knn_model = CachingModel("sklearn", 30)
-data_lock = asyncio.Lock()  # 임시
-sample_df, train_df = VarTimer(600), VarTimer(600)  # 임시
+mnist_model = CachingModel("pytorch", 600)
+knn_model = CachingModel("sklearn", 600)
+data_lock = asyncio.Lock()
+train_df = VarTimer(600)
 
 
 @router.put("/mnist")
-async def predict_mnist(num=1):
-
-    global sample_df, train_df
+async def predict_mnist(item: MnistData):
+    item = np.array(ast.literal_eval(item.mnist_num)).astype(np.uint8)
+    global train_df
     global mnist_model, knn_model
     model_name = "mnist"
     model_name2 = "mnist_knn"
 
-    # temp process
-
-    if not isinstance(sample_df._var, pd.DataFrame):
+    if not isinstance(train_df._var, pd.DataFrame):
         async with data_lock:
-            if not isinstance(sample_df._var, pd.DataFrame):
-                print(CLOUD_STORAGE_NAME, CLOUD_VALID_MNIST)
-                sample_df.cache_var(
-                    load_data_cloud(CLOUD_STORAGE_NAME, CLOUD_VALID_MNIST)
-                )
+            if not isinstance(train_df._var, pd.DataFrame):
                 train_df.cache_var(
                     load_data_cloud(CLOUD_STORAGE_NAME, CLOUD_TRAIN_MNIST)
                 )
 
-    sample_row = sample_df.get_var().iloc[int(num), 1:].values.astype(np.uint8)
     transform = transforms.Compose(
         [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
     )
-    aa = sample_row.reshape(28, 28)
-    sample = transform(aa)
-    sample = sample.view(1, 1, 28, 28)
+    reshaped_input = item.reshape(28, 28)
+    transformed_input = transform(reshaped_input)
+    transformed_input = transformed_input.view(1, 1, 28, 28)
 
     await mnist_model.get_model(model_name)
     await knn_model.get_model(model_name2)
 
-    # Net1
-    result = mnist_model.predict(sample)
-    p_res = softmax(result.detach().numpy()) * 100
-    percentage = np.around(p_res[0], 2).tolist()
+    def sync_call(mnist_model, knn_model, train_df):
+        # Net1
+        result = mnist_model.predict(transformed_input)
+        p_res = softmax(result.detach().numpy()) * 100
+        percentage = np.around(p_res[0], 2).tolist()
 
-    # Net2
-    result = mnist_model.predict(sample, True)
-    result = result.detach().numpy()
+        # Net2
+        result = mnist_model.predict(transformed_input, True)
+        result = result.detach().numpy()
 
-    # KNN
-    knn_result = knn_model.predict(result)
+        # KNN
+        knn_result = knn_model.predict(result)
 
-    xai_result = train_df.get_var().iloc[knn_result, 1:].values[0].tolist()
+        xai_result = train_df.get_var().iloc[knn_result, 1:].values[0].tolist()
+        return {
+            "result": {
+                "percentage": percentage,
+                "answer": percentage.index(max(percentage)),
+                "xai_result": xai_result,
+            },
+            "error": None,
+        }
 
-    return percentage, percentage.index(max(percentage)), xai_result
+    try:
+        result = await run_in_threadpool(
+            sync_call, mnist_model, knn_model, train_df
+        )
+        return result
+    except Exception as e:
+        return {"result": "Can't predict", "error": str(e)}
 
 
 insurance_model = CachingModel("xgboost", 30)
