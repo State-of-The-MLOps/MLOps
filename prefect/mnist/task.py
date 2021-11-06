@@ -71,7 +71,8 @@ def log_experiment(results, host_url, exp_name, metric):
         "lr": best_trial.config["lr"],
         "batch_size": best_trial.config["batch_size"],
     }
-
+    result_pred = best_trial.last_result["result_pred"]
+    metrics.update(result_pred)
     best_trained_model = MnistNet(configs["l1"])
     best_checkpoint_dir = best_trial.checkpoint.value
     model_state, optimizer_state = torch.load(
@@ -190,8 +191,8 @@ def case2():
 #     learning_rate = 1e-3
 #     device = "cpu"
 #     l1 = 128
-#     num_samples = 6
-#     max_num_epochs = 2
+#     num_samples = 1
+#     max_num_epochs = 1
 #     metric = 'loss'
 #     is_cloud=True
 
@@ -203,9 +204,7 @@ def case2():
 
 #     if is_end:
 #         print('True')
-#         feature_weight_df = make_feature_weight(results, device)
+#         feature_weight_df = make_feature_weight(results, device, is_cloud)
 #         train_knn(feature_weight_df, metric, exp_name)
 #     else:
 #         print('False')
-# feature_weight_df = make_feature_weight(results, device)
-# train_knn(feature_weight_df, metric, exp_name)
