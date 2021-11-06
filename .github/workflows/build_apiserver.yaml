@@ -1,7 +1,7 @@
 name: Build API server container
 on:
   push:
-    branches: [ main ]
+    branches: [ main, feature/kubernetes ]
 
 jobs:
   build:

@@ -1,6 +1,7 @@
 FROM hl8469/mlops-project:base-image-1.0
 
-COPY . /
+COPY ./prefect /prefect
+COPY ./set_prefect.sh /
 
 RUN prefect backend cloud
 
