@@ -138,13 +138,26 @@ def load_data_cloud(bucket_name, data_path):
     return df
 
 
-def load_data(is_cloud):
+def get_data_path_from_db(data_version, exp_name):
+    select_query = """
+        SELECT *
+        FROM data_info
+        where version = {} and exp_name = '{}'
+    """
+    (train_path, _, _, _), (valid_path, _, _, _) = engine.execute(
+        select_query.format(data_version, exp_name)
+    ).fetchall()
+
+    return train_path, valid_path
+
+
+def load_data(is_cloud, data_version, exp_name):
+
     if is_cloud:
         CLOUD_STORAGE_NAME = os.getenv("CLOUD_STORAGE_NAME")
-        CLOUD_TRAIN_MNIST = os.getenv("CLOUD_TRAIN_MNIST")
-        CLOUD_VALID_MNIST = os.getenv("CLOUD_VALID_MNIST")
-        train_df = load_data_cloud(CLOUD_STORAGE_NAME, CLOUD_TRAIN_MNIST)
-        valid_df = load_data_cloud(CLOUD_STORAGE_NAME, CLOUD_VALID_MNIST)
+        train_path, valid_path = get_data_path_from_db(data_version, exp_name)
+        train_df = load_data_cloud(CLOUD_STORAGE_NAME, train_path)
+        valid_df = load_data_cloud(CLOUD_STORAGE_NAME, valid_path)
     else:
         TRAIN_MNIST = os.getenv("TRAIN_MNIST")
         VALID_MNIST = os.getenv("VALID_MNIST")
@@ -154,7 +167,9 @@ def load_data(is_cloud):
     return train_df, valid_df
 
 
-def cnn_training(config, checkpoint_dir=None, is_cloud=True):
+def cnn_training(
+    config, data_version, exp_name, checkpoint_dir=None, is_cloud=True
+):
     Net = MnistNet(config["l1"])
     device = "cpu"
 
@@ -177,7 +192,7 @@ def cnn_training(config, checkpoint_dir=None, is_cloud=True):
     transform = transforms.Compose(
         [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
     )
-    train_df, valid_df = load_data(is_cloud)
+    train_df, valid_df = load_data(is_cloud, data_version, exp_name)
 
     trainset = MnistDataset(train_df, transform)
     validset = MnistDataset(valid_df, transform)
