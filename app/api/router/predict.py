@@ -17,12 +17,7 @@ from app import schema
 from app.api.data_class import MnistData, ModelCorePrediction
 from app.database import engine
 from app.query import SELECT_BEST_MODEL
-from app.utils import (
-    CachingModel,
-    VarTimer,
-    load_data_cloud,
-    softmax,
-)
+from app.utils import CachingModel, VarTimer, load_data_cloud, softmax
 from logger import L
 
 load_dotenv()
@@ -71,8 +66,8 @@ async def predict_mnist(item: MnistData):
     transformed_input = transform(reshaped_input)
     transformed_input = transformed_input.view(1, 1, 28, 28)
 
-    await mnist_model.get_model(model_name)
-    await knn_model.get_model(model_name2)
+    await mnist_model.get_model(model_name, load_type="score")
+    await knn_model.get_model(model_name2, load_type="score")
 
     def sync_call(mnist_model, knn_model, train_df):
         # Net1
@@ -115,11 +110,12 @@ async def predict_insurance(info: ModelCorePrediction):
     test_set = xgb.DMatrix(np.array([*info.values()]).reshape(1, -1))
 
     model_name = "insurance"
-    await insurance_model.get_model(model_name)
+    await insurance_model.get_model(model_name, load_type="production")
     result = insurance_model.predict(test_set)
 
     result = float(result[0])
     return result
+
 
 lock = asyncio.Lock()
 atmos_model_cache = VarTimer()
