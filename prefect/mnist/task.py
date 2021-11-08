@@ -28,7 +28,7 @@ load_dotenv()
 
 
 @task
-def tune_cnn(num_samples, max_num_epochs, is_cloud):
+def tune_cnn(num_samples, max_num_epochs, is_cloud, data_version, exp_name):
 
     config = {
         "l1": tune.sample_from(lambda _: 2 ** np.random.randint(7, 9)),
@@ -45,7 +45,12 @@ def tune_cnn(num_samples, max_num_epochs, is_cloud):
     )
 
     result = tune.run(
-        partial(cnn_training, is_cloud=is_cloud),
+        partial(
+            cnn_training,
+            is_cloud=is_cloud,
+            data_version=data_version,
+            exp_name=exp_name,
+        ),
         config=config,
         num_samples=num_samples,
         scheduler=scheduler,
@@ -55,7 +60,7 @@ def tune_cnn(num_samples, max_num_epochs, is_cloud):
 
 
 @task
-def log_experiment(results, host_url, exp_name, metric):
+def log_experiment(results, host_url, exp_name, metric, data_version):
     mlflow.set_tracking_uri(host_url)
     mlflow.set_experiment(exp_name)
     client = MlflowClient()
@@ -70,6 +75,7 @@ def log_experiment(results, host_url, exp_name, metric):
         "l1": best_trial.config["l1"],
         "lr": best_trial.config["lr"],
         "batch_size": best_trial.config["batch_size"],
+        "data_version": data_version,
     }
     result_pred = best_trial.last_result["result_pred"]
     metrics.update(result_pred)
@@ -111,10 +117,10 @@ def log_experiment(results, host_url, exp_name, metric):
 
 
 @task
-def make_feature_weight(results, device, is_cloud):
+def make_feature_weight(results, device, is_cloud, data_version, exp_name):
     best_trial = results.get_best_trial("loss", "min", "last")
 
-    train_df, _ = load_data(is_cloud)
+    train_df, _ = load_data(is_cloud, data_version, exp_name)
 
     configs = {
         "l1": best_trial.config["l1"],
