@@ -54,8 +54,8 @@ class MnistNet(torch.nn.Module):
         )
         self.flatten = torch.nn.Flatten()
         self.fc = torch.nn.Linear(7 * 7 * 64, l1, bias=True)
-        self.fc2 = torch.nn.Linear(l1, 32, bias=True)
-        self.last_layer = torch.nn.Linear(32, 10, bias=True)
+        self.fc2 = torch.nn.Linear(l1, 64, bias=True)
+        self.last_layer = torch.nn.Linear(64, 10, bias=True)
 
     def forward(self, x):
         out = self.layer1(x)
