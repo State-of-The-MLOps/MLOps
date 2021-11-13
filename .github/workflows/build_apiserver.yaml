@@ -1,7 +1,7 @@
 name: Build API server container
 on:
   push:
-    branches: [ main, feature/clean_depreaceted ]
+    branches: [ main, develop ]
 
 jobs:
   build:
