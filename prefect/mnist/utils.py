@@ -54,8 +54,8 @@ class MnistNet(torch.nn.Module):
         )
         self.flatten = torch.nn.Flatten()
         self.fc = torch.nn.Linear(7 * 7 * 64, l1, bias=True)
-        self.fc2 = torch.nn.Linear(l1, 32, bias=True)
-        self.last_layer = torch.nn.Linear(32, 10, bias=True)
+        self.fc2 = torch.nn.Linear(l1, 64, bias=True)
+        self.last_layer = torch.nn.Linear(64, 10, bias=True)
 
     def forward(self, x):
         out = self.layer1(x)
@@ -281,3 +281,6 @@ def preprocess_train(train_df, valid_df, batch_size):
     total_batch = len(train_loader)
 
     return (train_loader, valid_loader, total_batch)
+
+def get_mnist_avg(df):
+    return np.round(df.groupby('label').mean().mean(axis=1).values,2).tolist()

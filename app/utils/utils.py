@@ -32,8 +32,21 @@ def softmax(x):
     f_x = np.exp(x) / np.sum(np.exp(x))
     return f_x
 
+def get_data_path_from_db(data_version, exp_name):
+    select_query = """
+        SELECT *
+        FROM data_info
+        where version = {} and exp_name = '{}'
+    """
+    (train_path, _, _, _), (valid_path, _, _, _) = engine.execute(
+        select_query.format(data_version, exp_name)
+    ).fetchall()
 
-def load_data_cloud(bucket_name, data_path):
+    return train_path, valid_path
+
+
+def load_data_cloud(bucket_name, version):
+    data_path, _ = get_data_path_from_db(version, 'mnist')
     storage_client = storage.Client()
     bucket = storage_client.bucket(bucket_name)
     blob = bucket.blob(data_path)
@@ -153,3 +166,4 @@ class CachingModel(VarTimer):
                 return self._var.forward(data)
         else:
             return self._var.predict(data)
+

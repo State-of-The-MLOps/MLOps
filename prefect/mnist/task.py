@@ -9,10 +9,13 @@ import torch
 import torchvision.transforms as transforms
 from dotenv import load_dotenv
 from mlflow.tracking import MlflowClient
+from scipy.special import softmax
 from model import MnistNet
 from ray import tune
 from ray.tune.schedulers import ASHAScheduler
 from sklearn.neighbors import KNeighborsClassifier
+from mlflow.types.schema import Schema, TensorSpec
+from mlflow.models.signature import ModelSignature
 from torch.utils.data import DataLoader
 from utils import (
     MnistDataset,
@@ -20,6 +23,7 @@ from utils import (
     cnn_training,
     load_data,
     save_best_model,
+    get_mnist_avg
 )
 
 from prefect import task
@@ -67,6 +71,13 @@ def log_experiment(results, host_url, exp_name, metric, data_version):
     exp = client.get_experiment_by_name(exp_name)
 
     best_trial = results.get_best_trial("loss", "min", "last")
+    train_df, valid_df = load_data(is_cloud, data_version, exp_name)
+    train_avg = get_mnist_avg(train_df)
+    valid_avg = get_mnist_avg(valid_df)
+
+    train_avg = {f'color_avg_{k}':v for k, v in enumerate(train_avg)}
+    valid_avg = {f'color_avg_{k}':v for k, v in enumerate(valid_avg)}
+
     metrics = {
         "loss": best_trial.last_result["loss"],
         "accuracy": best_trial.last_result["accuracy"],
@@ -79,6 +90,8 @@ def log_experiment(results, host_url, exp_name, metric, data_version):
     }
     result_pred = best_trial.last_result["result_pred"]
     metrics.update(result_pred)
+    configs.update(train_avg)
+    configs.update(valid_avg)
     best_trained_model = MnistNet(configs["l1"])
     best_checkpoint_dir = best_trial.checkpoint.value
     model_state, optimizer_state = torch.load(
@@ -88,11 +101,16 @@ def log_experiment(results, host_url, exp_name, metric, data_version):
     best_trained_model = torch.jit.script(best_trained_model)
     exp_id = exp.experiment_id
     runs = mlflow.search_runs([exp_id])
+    input_schema = Schema([
+    TensorSpec(np.dtype(np.uint8), (-1, 28, 28, 1)),
+    ])
+    output_schema = Schema([TensorSpec(np.dtype(np.float32), (-1, 10))])
+    signature = ModelSignature(inputs=input_schema, outputs=output_schema)
     if runs.empty:
         with mlflow.start_run(experiment_id=exp_id):
             mlflow.log_metrics(metrics)
             mlflow.log_params(configs)
-            mlflow.pytorch.log_model(best_trained_model, artifact_path="model")
+            mlflow.pytorch.log_model(best_trained_model, signature = signature, artifact_path="model")
 
             save_best_model(
                 exp_name, "pytorch", metric, metrics[metric], exp_name
@@ -106,7 +124,7 @@ def log_experiment(results, host_url, exp_name, metric, data_version):
                 mlflow.log_metrics(metrics)
                 mlflow.log_params(configs)
                 mlflow.pytorch.log_model(
-                    best_trained_model, artifact_path="model"
+                    best_trained_model, signature = signature, artifact_path="model"
                 )
                 save_best_model(
                     exp_name, "pytorch", metric, metrics[metric], exp_name
@@ -133,7 +151,7 @@ def make_feature_weight(results, device, is_cloud, data_version, exp_name):
         os.path.join(best_checkpoint_dir, "checkpoint")
     )
     best_trained_model.load_state_dict(model_state)
-    best_trained_model = torch.nn.Sequential(
+    best_trained_model2 = torch.nn.Sequential(
         *list(best_trained_model.children())[:-1]
     )
     transform = transforms.Compose(
@@ -143,22 +161,25 @@ def make_feature_weight(results, device, is_cloud, data_version, exp_name):
     train_loader = DataLoader(trainset, batch_size=int(configs["batch_size"]))
 
     temp = pd.DataFrame(
-        columns=[f"{i}_feature" for i in range(32)], index=train_df.index
+        columns=[f"{i}_feature" for i in range(74)], index=train_df.index
     )
     batch_index = 0
     batch_size = train_loader.batch_size
     optimizer = torch.optim.Adam(
-        best_trained_model.parameters(), lr=configs["lr"]
+        best_trained_model2.parameters(), lr=configs["lr"]
     )
 
     for i, (mini_batch, _) in enumerate(train_loader):
+        add_weight = 10
         mini_batch = mini_batch.to(device)
         optimizer.zero_grad()
-        outputs = best_trained_model(mini_batch)
+        outputs = best_trained_model2(mini_batch)
+        preds = best_trained_model(mini_batch)
         batch_index = i * batch_size
         temp.iloc[
             batch_index : batch_index + batch_size, :
-        ] = outputs.detach().numpy()
+        ] = np.concatenate((outputs.detach().numpy(), softmax(preds.detach().numpy().astype(float)) * add_weight), axis=1)
+
 
     temp.reset_index(inplace=True)
     feature_weight_df = temp
@@ -184,33 +205,32 @@ def case2():
     print("end")
 
 
-# def test(results):
-#     aa = results.get_best_trial("loss", "min", "last")
-#     print(dir(aa))
-#     print(aa.trial_id)
-
 # if __name__ == "__main__":
 #     # data_path = "C:\Users\TFG5076XG\Documents\MLOps\prefect\mnist\mnist.csv"
-#     host_url = "http://localhost:5001"
+#     host_url = "http://localhost:5000"
 #     exp_name = "mnist"
-#     batch_size = 64
-#     learning_rate = 1e-3
 #     device = "cpu"
-#     l1 = 128
 #     num_samples = 1
 #     max_num_epochs = 1
 #     metric = 'loss'
 #     is_cloud=True
+#     data_version = 3
 
 #     mlflow.set_tracking_uri(host_url)
 #     mlflow.set_experiment(exp_name)
 
-#     results = tune_cnn(num_samples, max_num_epochs, is_cloud)
-#     is_end = log_experiment(results, host_url, exp_name, metric)
+#     results = tune_cnn(
+#                 num_samples, max_num_epochs, is_cloud, data_version, exp_name
+#     )
+#     is_end = log_experiment(
+#         results, host_url, exp_name, metric, data_version
+#     )
 
 #     if is_end:
-#         print('True')
-#         feature_weight_df = make_feature_weight(results, device, is_cloud)
+#         feature_weight_df = make_feature_weight(
+#             results, "cpu", is_cloud, data_version, exp_name
+#         )
 #         train_knn(feature_weight_df, metric, exp_name)
+
 #     else:
 #         print('False')
