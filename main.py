@@ -21,7 +21,7 @@ app.include_router(predict.router)
 
 @app.get("/")
 def hello_world():
-    return {"message": "Hello World"}
+    return {"message": "Hi I'm choonsik!"}
 
 
 if __name__ == "__main__":
