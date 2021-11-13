@@ -135,3 +135,23 @@ spec:
             secretName: prefect-config
       nodeSelector:
         kubernetes.io/hostname: cd-test-3
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: front-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: front-service
+  template:
+    metadata:
+      name: front
+      labels:
+        app: front-service
+    spec:
+      containers:
+      - name: front-worker
+        image: ehddnr/mnist_front:1.0.0
+        imagePullPolicy: "Always"

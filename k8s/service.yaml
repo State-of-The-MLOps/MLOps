@@ -38,3 +38,17 @@ spec:
   selector:
     app: postgres-server
   type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: front-service
+spec:
+  ports:
+    - name: front-port
+      port: 3000
+      targetPort: 3000
+      nodePort: 32222
+  selector:
+    app: front-app
+  type: NodePort
