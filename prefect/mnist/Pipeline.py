@@ -55,7 +55,7 @@ class Pipeline:
                 num_samples, max_num_epochs, is_cloud, data_version, exp_name
             )
             is_end = log_experiment(
-                results, host_url, exp_name, metric, data_version
+                results, host_url, exp_name, metric, data_version, is_cloud
             )
 
             with case(is_end, True):
