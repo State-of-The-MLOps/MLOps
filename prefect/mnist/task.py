@@ -31,7 +31,7 @@ from prefect import task
 load_dotenv()
 
 
-# @task
+@task
 def tune_cnn(num_samples, max_num_epochs, is_cloud, data_version, exp_name):
 
     config = {
@@ -63,7 +63,7 @@ def tune_cnn(num_samples, max_num_epochs, is_cloud, data_version, exp_name):
     return result
 
 
-# @task
+@task
 def log_experiment(results, host_url, exp_name, metric, data_version, is_cloud):
     mlflow.set_tracking_uri(host_url)
     mlflow.set_experiment(exp_name)
@@ -134,7 +134,7 @@ def log_experiment(results, host_url, exp_name, metric, data_version, is_cloud):
             return False
 
 
-# @task
+@task
 def make_feature_weight(results, device, is_cloud, data_version, exp_name):
     best_trial = results.get_best_trial("loss", "min", "last")
 
@@ -187,7 +187,7 @@ def make_feature_weight(results, device, is_cloud, data_version, exp_name):
     return feature_weight_df
 
 
-# @task
+@task
 def train_knn(feature_weight_df, metric, exp_name):
     KNN = KNeighborsClassifier(n_neighbors=3)
     KNN.fit(
@@ -200,7 +200,7 @@ def train_knn(feature_weight_df, metric, exp_name):
     save_best_model("mnist_knn", "sklearn", metric, 9999, exp_name, True)
 
 
-# @task
+@task
 def case2():
     print("end")
 
