@@ -45,8 +45,8 @@ def get_data_path_from_db(data_version, exp_name):
     return train_path, valid_path
 
 
-def load_data_cloud(bucket_name):
-    data_path, _ = get_data_path_from_db(2, 'mnist')
+def load_data_cloud(bucket_name, version):
+    data_path, _ = get_data_path_from_db(version, 'mnist')
     storage_client = storage.Client()
     bucket = storage_client.bucket(bucket_name)
     blob = bucket.blob(data_path)
@@ -166,3 +166,4 @@ class CachingModel(VarTimer):
                 return self._var.forward(data)
         else:
             return self._var.predict(data)
+

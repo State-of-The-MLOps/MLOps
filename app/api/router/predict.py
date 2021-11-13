@@ -45,17 +45,19 @@ train_df = VarTimer(600)
 
 @router.put("/mnist")
 async def predict_mnist(item: MnistData):
-    item2 = np.array(ast.literal_eval(item.mnist_num)).astype(np.uint8)
     global train_df
     global mnist_model, knn_model
+    
+    item2 = np.array(ast.literal_eval(item.mnist_num)).astype(np.uint8)
     model_name = "mnist"
     model_name2 = "mnist_knn"
+    version = 3
 
     if not isinstance(train_df._var, pd.DataFrame):
         async with data_lock:
             if not isinstance(train_df._var, pd.DataFrame):
                 train_df.cache_var(
-                    load_data_cloud(CLOUD_STORAGE_NAME)
+                    load_data_cloud(CLOUD_STORAGE_NAME, version)
                 )
 
     transform = transforms.Compose(
@@ -93,7 +95,7 @@ async def predict_mnist(item: MnistData):
             sync_call, mnist_model, knn_model, train_df
         )
         L.info(
-            f"Predict Args info: {item.mnist_num}\n\tmodel_name: {model_name}\n\tPrediction Result: {result}"
+            f"Predict Args info: {item.mnist_num}\n\tmodel_name: {model_name}\n\tPrediction Result: {result}\n\tcolor_avg_{result['result']['answer']}: {np.round(np.mean(item2), 2)}"
         )
         return result
     except Exception as e:

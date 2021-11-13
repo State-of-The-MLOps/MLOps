@@ -23,6 +23,7 @@ from utils import (
     cnn_training,
     load_data,
     save_best_model,
+    get_mnist_avg
 )
 
 from prefect import task
@@ -70,6 +71,13 @@ def log_experiment(results, host_url, exp_name, metric, data_version):
     exp = client.get_experiment_by_name(exp_name)
 
     best_trial = results.get_best_trial("loss", "min", "last")
+    train_df, valid_df = load_data(is_cloud, data_version, exp_name)
+    train_avg = get_mnist_avg(train_df)
+    valid_avg = get_mnist_avg(valid_df)
+
+    train_avg = {f'color_avg_{k}':v for k, v in enumerate(train_avg)}
+    valid_avg = {f'color_avg_{k}':v for k, v in enumerate(valid_avg)}
+
     metrics = {
         "loss": best_trial.last_result["loss"],
         "accuracy": best_trial.last_result["accuracy"],
@@ -82,6 +90,8 @@ def log_experiment(results, host_url, exp_name, metric, data_version):
     }
     result_pred = best_trial.last_result["result_pred"]
     metrics.update(result_pred)
+    configs.update(train_avg)
+    configs.update(valid_avg)
     best_trained_model = MnistNet(configs["l1"])
     best_checkpoint_dir = best_trial.checkpoint.value
     model_state, optimizer_state = torch.load(
@@ -204,7 +214,7 @@ def case2():
 #     max_num_epochs = 1
 #     metric = 'loss'
 #     is_cloud=True
-#     data_version = 2
+#     data_version = 3
 
 #     mlflow.set_tracking_uri(host_url)
 #     mlflow.set_experiment(exp_name)

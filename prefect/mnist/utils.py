@@ -281,3 +281,6 @@ def preprocess_train(train_df, valid_df, batch_size):
     total_batch = len(train_loader)
 
     return (train_loader, valid_loader, total_batch)
+
+def get_mnist_avg(df):
+    return np.round(df.groupby('label').mean().mean(axis=1).values,2).tolist()
