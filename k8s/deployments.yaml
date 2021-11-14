@@ -156,3 +156,5 @@ spec:
         image: ehddnr/mnist_front:1.0.0
         imagePullPolicy: "Always"
         ports:
+        - containerPort: 3000
+          protocol: TCP
