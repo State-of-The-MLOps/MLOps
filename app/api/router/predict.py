@@ -116,7 +116,10 @@ async def predict_insurance(info: ModelCorePrediction):
     result = insurance_model.predict(test_set)
 
     result = float(result[0])
-    return result
+    return {
+        "result": result,
+        "error": None,
+    }
 
 
 lock = asyncio.Lock()
