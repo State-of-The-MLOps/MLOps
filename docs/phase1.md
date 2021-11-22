@@ -24,9 +24,12 @@
 
 ### Project
 
-- [Phase1](https://github.com/State-of-The-MLOps/MLOps/releases/tag/v1.0.0) 에서 Source코드를 다운받습니다.
-- `conda create --name mlops-phase1 python=3.8
-- `pip install -r requirements.txt` 로 필요한 라이브러리를 설치합니다.
-- `python main.py` 로 파일을 실행시킵니다.
+0. data&env 단계를 수행합니다.
+1. [Phase1](https://github.com/State-of-The-MLOps/MLOps/releases/tag/v1.0.0) 에서 Source코드를 다운받습니다.
+2. `conda create --name mlops-phase1 python=3.8`
+3. `conda activate mlops-phase1`
+4. `pip install -r requirements.txt` 로 필요한 라이브러리를 설치합니다.
+5. `python main.py` 로 서버를 실행시킵니다.
+6. http://localhost:8000/docs 에서 fastapi swagger를 통해 api를 테스트합니다.
 
 ## Review
