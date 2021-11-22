@@ -1,7 +1,7 @@
 name: Build API server container
 on:
   push:
-    branches: [ main, feature/CD_test ]
+    branches: [ main ]
 
 jobs:
   build:
