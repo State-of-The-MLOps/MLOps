@@ -1,7 +1,7 @@
 name: Build API server container
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
 
 jobs:
   build:
@@ -40,3 +40,13 @@ jobs:
 
       - name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
+
+      - name: Deploy
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.REMOTE_IP }}
+          username: ${{ secrets.REMOTE_SSH_ID }}
+          port: ${{ secrets.REMOTE_SSH_PORT }}
+          key: ${{ secrets.REMOTE_SSH_KEY }}
+          script: |
+            kubectl rollout restart -f ./MLOps/k8s/prepi_deployments.yaml
