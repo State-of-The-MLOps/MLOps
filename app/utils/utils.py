@@ -46,6 +46,33 @@ def load_data_cloud(bucket_name, data_path):
     df = pd.read_csv(data)
 
     return df
+
+def get_data_path_from_db(data_version, exp_name):
+    select_query = """
+        SELECT *
+        FROM data_info
+        where version = {} and exp_name = '{}'
+    """
+    (train_path, _, _, _), (valid_path, _, _, _) = engine.execute(
+        select_query.format(data_version, exp_name)
+    ).fetchall()
+
+    return train_path, valid_path
+
+def load_data(is_cloud, data_version, exp_name):
+
+    if is_cloud:
+        CLOUD_STORAGE_NAME = os.getenv("CLOUD_STORAGE_NAME")
+        train_path, valid_path = get_data_path_from_db(data_version, exp_name)
+        train_df = load_data_cloud(CLOUD_STORAGE_NAME, train_path)
+        valid_df = load_data_cloud(CLOUD_STORAGE_NAME, valid_path)
+    else:
+        TRAIN_MNIST = os.getenv("TRAIN_MNIST")
+        VALID_MNIST = os.getenv("VALID_MNIST")
+        train_df = pd.read_csv(TRAIN_MNIST)
+        valid_df = pd.read_csv(VALID_MNIST)
+
+    return train_df, valid_df
 class VarTimer:
     def __init__(self, caching_time=5):
         self._var = None

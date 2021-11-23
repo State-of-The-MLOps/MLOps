@@ -20,7 +20,7 @@ from app.query import SELECT_BEST_MODEL
 from app.utils import (
     CachingModel,
     VarTimer,
-    load_data_cloud,
+    load_data,
     softmax,
 )
 from logger import L
@@ -56,13 +56,15 @@ async def predict_mnist(item: MnistData):
     global mnist_model, knn_model
     model_name = "mnist"
     model_name2 = "mnist_knn"
+    is_cloud = False
+    data_version = 1
+    exp_name = 'mnist'
 
     if not isinstance(train_df._var, pd.DataFrame):
         async with data_lock:
             if not isinstance(train_df._var, pd.DataFrame):
-                train_df.cache_var(
-                    load_data_cloud(CLOUD_STORAGE_NAME, CLOUD_TRAIN_MNIST)
-                )
+                df, _ = load_data(is_cloud, data_version, exp_name)
+                train_df.cache_var(df)
 
     transform = transforms.Compose(
         [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
