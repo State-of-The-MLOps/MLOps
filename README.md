@@ -11,65 +11,24 @@
 [![](https://img.shields.io/static/v1?label=Prefect&message=0.15.6&color=27b1ff&labelColor=gray&style=flat&logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAoCAYAAACM/rhtAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAAHsIAAB7CAW7QdT4AAASLSURBVFhH7Zd/aBxFFMff7P1IpdiEqA0osdaDCi2hYEXbXG1yMesl/mdj0iJoSsXoH/5jECGJWA9MqCj0H/8QCkJJ8A8RLFVjTpBSqEWxsUWlDWqr1ibRYCHRSHO3O/N8szdzt3f2rnOXC6nQLzzezpvd2c99Z3Z2D27qRtK20xhqQQyqZlXEVF6WJJizDp8SDgyhCwIdNnzH3zB2IsZcdUrFWhbg5u8xHKjBp5HDADjsXkE46AAQKKCLP4kUjNTWs7HJBxhVKlNFgAqsFwQMosvu8aDy4FT22ngR0zB8+zwbnXyufNCyADcjhkMXYJ/gOAiCbchCFIPz1YVLoA6MzE6zUUiwtBryujICbDmOwflG2I8CB5HAJMT1wPSxruf68GfKI3/WsSNg4Kilckkt3g13CoH7aTo30LoCsQTAdaaQNS/76l746t51Xh/bKFLscN1lHFPDl5QR4GSEXfpuk7XddfAxnsKvsnDqpllIXddtmfV5BXWKWjV8SRkBap3fan069aC1HTl2EuiXRWF0W2bZvkZdhonKAtT6YZc1cSFu7aAntIOn8VQenMwKolRdhokqAtT65XEr+dseK8o5xgn0C1M42V5RBws1u8/67PfnrZ13zSRfX+/8kYPRcDJrOF/dRFV51e1+9sUYcv6q4Ly16f6H4NdUA3z911a4vNiQv834tiXabpJ41OpQQxTVsgD3vjDUxt30AcHdXcJ1gXMO9qNxcFwOS2kHfpyvh5MzTXBpviG3D2pQjkkYXyHA3v7EI44Ec/nDnBOYB0dfCRTtdgeEQ0GwLAsYjb6UdmFqrg6S5++Di3PrCYwGQBkrAPjMy8O2w7l0LJpxLAcn3ZO1NjsOa29ZQ4DMg7SIUmZEhHPT6+DY2QhMzd5WXcC+obd2cu68IbhozsCQW4WAlKWDre1xqLt1bQaQEaCEVLABBTs1WwvHvmn88PTb9bvVLYrK6Ckmd16haWlGFPTDKURhRs8hGZyLDFQROEpzWxr/6X+za+FJNXxJGW4zEkRBKBh6N+dqGpyOOUHrafXDMcu6YgUDA1jDI11286FYbKPRRmMESPfNAGjH/KFBZaZ+IQE9MAXJ2AKzWIIFU5En7OjBnlhsUQ1rJDMH89xSMNm2H5h+CbnFqZ8AFwMBdjAddiJ7Olte67HtBTVaWTJ0UEJpx3xAfvcULDl21XX5oTWhmsjeztaBXtu+ooapSEaANHEKwBcEJQqAaXoxwEKb+no6+7vi0Tl1+bJk6CDtcX4YL/8XmOp4dfrbGXVZVVTZGvTCB5wN+YqorsymWAJl3SsElX36WKgrqiezKdZT6oFo0GvlVXJQu+OtQ79jhW4SZLVltgY9hzSIckxF/pO8WmswO7XSJQVa6J4Xq7UGNUDhuss/Pkfn9CYSiapSGjooAfxOaWDvJX2GvnS6T2zb0nRy4qjRn/FyZPQ92N330oQQPJ7/HchPoeAjyQ+OjNMp1V98SuVNsQzAz4mmbeL9d6ME94nszpy1MjIEFCmC+9hCtuOj0Xfax987fFx13Rjq7j4QVoc39T8TwL/JfZXfhOXXJQAAAABJRU5ErkJggg==)](https://docs.prefect.io/)
 [![](https://img.shields.io/static/v1?label=RAY&message=1.7.0&color=00a2e9&labelColor=gray&style=flat&logo=data:image/png;base64,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)](https://docs.ray.io/en/latest/)
 
-
+# Table of contents
 * [1. 왜 MLOps 인가요?](#왜-MLOps-인가요?)
-  * [2. Phase1](#Phase1)
-* [띄어쓰기 테스트](#띄어쓰기-테스트)
+* [2. Phase2](#Phase2)
+* [2. Phase3](#Phase3)
 
-## 왜 MLOps 인가요?
+<br/>
 
+# 왜 MLOps 인가요?
 - 머신러닝은 세상의 많은 문제를 효율적으로 해결하는 도구입니다.
 - 하지만 현실의 문제를 해결하는 <strong>머신러닝 서비스</strong>를 운영하는것은 머신러닝 모델과 조금은 다른 이야기입니다.
   - 개발된 모델에 대해 endpoint가 제공되어야 합니다.
   - 변화하는 데이터에 대응하기위해 모델성능 추적이 이루어져야합니다.
   - 지속적인 모델 업데이트가 이루어짐에따라 비교작업이 필요합니다.
 
-## 패치노트
-### Phase2
+<br/>
 
-```
-┌── app/
-│   ├── api/
-│   │   ├── data_class.py
-│   │   └── router/
-│   │       └── predict.py
-│   ├── database.py
-│   ├── query.py
-│   ├── schema.py
-│   └── utils/
-│       └── utils.py
-├── deprecated/
-│   └── ...
-├── Dockerfile.baseimage
-├── Dockerfile.fastapi
-├── Dockerfile.prefect
-├── docs/
-│   └── ...
-├── k8s/
-│   ├── configmap.yaml
-│   ├── deployments.yaml
-│   ├── kustomization.yaml
-│   ├── prepi_deployments.yaml
-│   ├── pv-pvc.yaml
-│   └── service.yaml
-├── logger.py
-├── main.py
-├── prefect/
-│   ├── atmos_tmp_pipeline/
-│   │   ├── main.py
-│   │   ├── pipeline.py
-│   │   ├── query.py
-│   │   ├── task.py
-│   │   └── utils.py
-│   ├── insurance/
-│   │   └── ...
-│   └── mnist/
-│       └── ...
-├── pyproject.toml
-├── README.md
-├── requirements.txt
-└── set_prefect.sh
-```
+# Phase2
+![](./docs/img/phase2.png)
 
 - [Phase2 상세내용](./docs/phase2.md)
 - Phase2 단계에서는 MLOps1단계와 자동화 배포 단계를 다루고있습니다.
@@ -82,38 +41,10 @@
   - 모델은 prediction 요청이 들어왔을 때만 로드되며 로드된 모델은 정해진 시간만큼 캐싱되어 사용됩니다.
   - 이를 위해 redis를 고려하였으나 최종적으로는 사용하지 않습니다. [변경이유](./docs/shoveling_note.md#Redis)
 
-### Phase1
+<br/>
 
-```
-┌── app/
-│   ├── api/
-│   │   ├── router/
-│   │   │   ├── predict.py
-│   │   │   └── train.py
-│   │   └── schemas.py
-│   ├── database.py
-│   ├── models.py
-│   ├── query.py
-│   └── utils.py
-├── docs/
-│   └── api-list.md
-├── experiments/
-│   ├── atmos_tmp_01/
-│   │   ├── config.yml
-│   │   ├── preprocessing.py
-│   │   ├── search_space.json
-│   │   └── train.py
-│   ├── expr_db.py
-│   └── insurance/
-│       ├── config.yml
-│       ├── query.py
-│       ├── search_space.json
-│       └── trial.py
-├── logger.py
-├── main.py
-├── pyproject.toml
-└── requirements.txt
-```
+# Phase1 (2021.08.28 ~ 2021.10.06)
+![](./docs/img/phase1.png)
 
 - [Phase1 상세내용](./docs/phase1.md)
 - Phase1에서는 MLOps 0단계 구성을 위해 노력했습니다.
@@ -129,6 +60,3 @@
 - logger
   - 요청, 실험진행 등을 log로 남깁니다.
 
-
-# 띄어쓰기 테스트
-ㅁㄴㅇ
