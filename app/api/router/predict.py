@@ -17,12 +17,7 @@ from app import schema
 from app.api.data_class import MnistData, ModelCorePrediction
 from app.database import engine
 from app.query import SELECT_BEST_MODEL
-from app.utils import (
-    CachingModel,
-    VarTimer,
-    load_data_cloud,
-    softmax,
-)
+from app.utils import CachingModel, VarTimer, load_data_cloud, softmax
 from logger import L
 
 load_dotenv()
@@ -33,7 +28,6 @@ host_url = os.getenv("MLFLOW_HOST")
 mlflow.set_tracking_uri(host_url)
 reset_sec = 5
 CLOUD_STORAGE_NAME = os.getenv("CLOUD_STORAGE_NAME")
-CLOUD_TRAIN_MNIST = os.getenv("CLOUD_TRAIN_MNIST")
 CLOUD_VALID_MNIST = os.getenv("CLOUD_VALID_MNIST")
 
 router = APIRouter(
@@ -51,42 +45,41 @@ train_df = VarTimer(600)
 
 @router.put("/mnist")
 async def predict_mnist(item: MnistData):
-    item = np.array(ast.literal_eval(item.mnist_num)).astype(np.uint8)
     global train_df
     global mnist_model, knn_model
+    
+    item2 = np.array(ast.literal_eval(item.mnist_num)).astype(np.uint8)
     model_name = "mnist"
     model_name2 = "mnist_knn"
+    version = 3
 
     if not isinstance(train_df._var, pd.DataFrame):
         async with data_lock:
             if not isinstance(train_df._var, pd.DataFrame):
                 train_df.cache_var(
-                    load_data_cloud(CLOUD_STORAGE_NAME, CLOUD_TRAIN_MNIST)
+                    load_data_cloud(CLOUD_STORAGE_NAME, version)
                 )
 
     transform = transforms.Compose(
         [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
     )
-    reshaped_input = item.reshape(28, 28)
+    reshaped_input = item2.reshape(28, 28)
     transformed_input = transform(reshaped_input)
     transformed_input = transformed_input.view(1, 1, 28, 28)
 
-    await mnist_model.get_model(model_name)
-    await knn_model.get_model(model_name2)
+    await mnist_model.get_model(model_name, load_type="production")
+    await knn_model.get_model(model_name2, load_type="production")
 
     def sync_call(mnist_model, knn_model, train_df):
         # Net1
         result = mnist_model.predict(transformed_input)
         p_res = softmax(result.detach().numpy()) * 100
         percentage = np.around(p_res[0], 2).tolist()
-
         # Net2
         result = mnist_model.predict(transformed_input, True)
-        result = result.detach().numpy()
-
+        result = np.concatenate((result.detach().numpy(), np.array(percentage).reshape(1,-1) / 10), axis=1)
         # KNN
         knn_result = knn_model.predict(result)
-
         xai_result = train_df.get_var().iloc[knn_result, 1:].values[0].tolist()
         return {
             "result": {
@@ -101,8 +94,12 @@ async def predict_mnist(item: MnistData):
         result = await run_in_threadpool(
             sync_call, mnist_model, knn_model, train_df
         )
+        L.info(
+            f"Predict Args info: {item.mnist_num}\n\tmodel_name: {model_name}\n\tPrediction Result: {result}\n\tcolor_avg_{result['result']['answer']}: {np.round(np.mean(item2), 2)}"
+        )
         return result
     except Exception as e:
+        L.error(e)
         return {"result": "Can't predict", "error": str(e)}
 
 
@@ -115,11 +112,15 @@ async def predict_insurance(info: ModelCorePrediction):
     test_set = xgb.DMatrix(np.array([*info.values()]).reshape(1, -1))
 
     model_name = "insurance"
-    await insurance_model.get_model(model_name)
+    await insurance_model.get_model(model_name, load_type="production")
     result = insurance_model.predict(test_set)
 
     result = float(result[0])
-    return result
+    return {
+        "result": result,
+        "error": None,
+    }
+
 
 lock = asyncio.Lock()
 atmos_model_cache = VarTimer()

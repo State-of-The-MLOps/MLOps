@@ -27,12 +27,12 @@ VALID_MNIST=/절대/경로/mnist_valid.csv
 2. `conda create --name mlops-phase1 python=3.8`
 3. `conda activate mlops-phase1`
 4. `bash requirements.sh`로 필요한 라이브러리를 설치합니다.
-   * requirements.txt로 설치해본 결과 tfdv문제때문에 설치가 원할하지 않습니다.
-   * 설치가 원할하지 않다면 sh파일의 명령어를 복사해서 커맨드 창에서 설치해줍니다. (ex 윈도우환경)
+   * requirements.txt로 설치해본 결과 tfdv문제때문에 설치가 원활하지 않습니다.
+   * 설치가 원활하지 않다면 sh파일의 명령어를 복사해서 커맨드 창에서 설치해줍니다. (ex 윈도우환경)
 5. fast api server를 실행시킵니다.
    * `python main.py`
 6. mlflow server를 실행시킵니다
-   * `mlflow server --backend-store-uri postgresql://postgres:0000@localhost:5432/postgres --default-artifact-root <저장 경로>`
+   * `mlflow server --backend-store-uri postgresql://<user name>:<pass word>@localhost:5432/postgres --default-artifact-root <저장 경로>`
 7. prefect를 실행해 줍니다.
    1. `python prefect/mnist/main.py` : mnist pipeline 추가
    2. `prefect agent local start`

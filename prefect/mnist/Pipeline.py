@@ -49,13 +49,18 @@ class Pipeline:
             num_samples = Parameter("num_samples", 1)
             max_num_epochs = Parameter("max_num_epochs", 1)
             is_cloud = Parameter("is_cloud", True)
+            data_version = Parameter("data_version", 3)
 
-            results = tune_cnn(num_samples, max_num_epochs, is_cloud)
-            is_end = log_experiment(results, host_url, exp_name, metric)
+            results = tune_cnn(
+                num_samples, max_num_epochs, is_cloud, data_version, exp_name
+            )
+            is_end = log_experiment(
+                results, host_url, exp_name, metric, data_version, is_cloud
+            )
 
             with case(is_end, True):
                 feature_weight_df = make_feature_weight(
-                    results, "cpu", is_cloud
+                    results, "cpu", is_cloud, data_version, exp_name
                 )
                 train_knn(feature_weight_df, metric, exp_name)
 

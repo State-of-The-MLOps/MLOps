@@ -32,8 +32,21 @@ def softmax(x):
     f_x = np.exp(x) / np.sum(np.exp(x))
     return f_x
 
+def get_data_path_from_db(data_version, exp_name):
+    select_query = """
+        SELECT *
+        FROM data_info
+        where version = {} and exp_name = '{}'
+    """
+    (train_path, _, _, _), (valid_path, _, _, _) = engine.execute(
+        select_query.format(data_version, exp_name)
+    ).fetchall()
 
-def load_data_cloud(bucket_name, data_path):
+    return train_path, valid_path
+
+
+def load_data_cloud(bucket_name, version):
+    data_path, _ = get_data_path_from_db(version, 'mnist')
     storage_client = storage.Client()
     bucket = storage_client.bucket(bucket_name)
     blob = bucket.blob(data_path)
@@ -46,6 +59,8 @@ def load_data_cloud(bucket_name, data_path):
     df = pd.read_csv(data)
 
     return df
+
+
 class VarTimer:
     def __init__(self, caching_time=5):
         self._var = None
@@ -100,33 +115,44 @@ class CachingModel(VarTimer):
         self._run_id = None
         self._model_type = model_type
         self._lock = asyncio.Lock()
+        self._model_name = None
+        self._model_type_dict = {
+            "keras": mlflow.keras.load_model,
+            "pytorch": mlflow.pytorch.load_model,
+            "sklearn": mlflow.sklearn.load_model,
+            "xgboost": mlflow.xgboost.load_model,
+        }
+        self._model_load_way = {
+            "production": "models:/{}/Production",
+            "score": "runs:/{}/model",
+        }
 
     def _load_run_id(self, model_name):
         self._run_id = engine.execute(
             SELECT_BEST_MODEL.format(model_name)
         ).fetchone()[0]
 
-    def _load_model_mlflow(self):
-        model = None
-        if self._model_type == "keras":
-            model = mlflow.keras.load_model(f"runs:/{self._run_id}/model")
-        elif self._model_type == "pytorch":
-            model = mlflow.pytorch.load_model(f"runs:/{self._run_id}/model")
-        elif self._model_type == "sklearn":
-            model = mlflow.sklearn.load_model(f"runs:/{self._run_id}/model")
-        elif self._model_type == "xgboost":
-            model = mlflow.xgboost.load_model(f"runs:/{self._run_id}/model")
-        else:
-            print("Only keras, torch, sklearn is allowed")
+    def _load_model_mlflow(self, load_type):
+        _model_load_arg = {
+            "production": self._model_name,
+            "score": self._run_id,
+        }
+        model_uri = self._model_load_way[load_type].format(
+            _model_load_arg[load_type]
+        )
+        model = self._model_type_dict[self._model_type](model_uri)
 
         return model
 
-    async def get_model(self, model_name):
+    async def get_model(self, model_name, load_type="production"):
         if not super().is_var:
             async with self._lock:
                 if not super().is_var:
-                    self._load_run_id(model_name)
-                    super().cache_var(self._load_model_mlflow())
+                    if load_type == "production":
+                        self._model_name = model_name
+                    else:
+                        self._load_run_id(model_name)
+                    super().cache_var(self._load_model_mlflow(load_type))
         else:
             super().reset_timer()
 
@@ -140,3 +166,4 @@ class CachingModel(VarTimer):
                 return self._var.forward(data)
         else:
             return self._var.predict(data)
+

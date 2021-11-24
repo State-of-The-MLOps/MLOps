@@ -7,11 +7,11 @@
 ### data & env
 
 - postgres db 를 준비합니다.
-  - `docker run --rm -P -p 127.0.0.1:5432:5432 -e POSTGRES_PASSWORD=0000 -e POSTGRES_USER=postgres --name pgtest postgres:13.3` 
+  - `docker run -d --name postgre -p 5432:5432 -e POSTGRES_PASSWORD=<postgres password> postgres:13.4` 
 - [Data](https://drive.google.com/file/d/1YPOPA1jnXFyJvl6ikThejvVnxOJl9ya5/view?usp=sharing)를 다운로드 받아 postgresql db에 넣어줍니다.
-  - `docker cp </폴더/경로/postgres_20211026.sql> <container_name>:./postgres_20211026.sql`
+  - `docker cp </폴더/경로/postgres_20211026.sql> <container_name>:/postgres_20211026.sql`
   - `docker exec -it <containerID> bash`
-  - `psql postgres < postgres_20211026.sql`
+  - `psql postgres < /postgres_20211026.sql`
     - 만약 컨테이너에서 role "root" does not exist 에러가 난다면 `su -l postgres` 로 유저를 변경한 후에 작업해 주세요
 - enviornment variable 를 .env파일에 포함시켜 줍니다.
   ```plain
