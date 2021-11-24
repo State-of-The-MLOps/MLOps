@@ -96,4 +96,6 @@ VALID_MNIST=/절대/경로/mnist_valid.csv
 
 0. data&env 단계를 수행합니다.
 1. `cd k8s && kubectl apply -k kustomization.yaml`
+
+참고: [frontend](https://github.com/ehddnr301/mnist_test_FE)
 # Review
