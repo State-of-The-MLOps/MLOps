@@ -14,24 +14,37 @@
 # Table of contents
 * [1. 프로젝트 소개](#프로젝트-소개)
 * [2. 프로젝트 실행해보기](#프로젝트-실행해보기)
-* [3. Phase2(2021.10.06 ~ 2021.11.13)](#Phase2(2021.10.06-~-2021.11.13))
-* [4. Phase1(2021.08.28 ~ 2021.10.06)](#Phase1(2021.08.28-~-2021.10.06))
+* [3. Phase2(2021.10.06 ~ 2021.11.13)](#Phase2\(2021.10.06-~-2021.11.13\))
+* [4. Phase1(2021.08.28 ~ 2021.10.06)](#Phase1\(2021.08.28-~-2021.10.06\))
 
 <br/>
 
 # 프로젝트 소개
-저희 프로젝트는 Phase1, Phase2로 이루어져 있습니다. 
+> 저희 프로젝트는 여러개의 Phase로 이루어져 있습니다. 현재 단락에서 각 Phase에 대하여 간략히 설명하였고, 각 단계에서 구현한 구체적인 내용에 대한 자세한 설명은 아래에 따로 기술하였습니다.
+
+<br/>
 
 **Phase 1**  
-Phase 1에서는 [참고 페이지](https://cloud.google.com/architecture/mlops-continuous-delivery-and-automation-pipelines-in-machine-learning)에서 이야기하고 있는 MLOps 0단계를 구현하기 위해 노력하였습니다. 2021.08.28 ~ 2021.10.06 기간동안 진행되었으며 현재 개발종료되었습니다. 각 단계에서 구현한 구체적인 내용에 대한 자세한 설명은 아래에 따로 기술하였습니다.
+* Phase 1에서는 [참고 페이지](https://cloud.google.com/architecture/mlops-continuous-delivery-and-automation-pipelines-in-machine-learning)에서 이야기하고 있는 MLOps 0단계를 구현하기 위해 노력하였습니다.
+* NNI를 이용하여 hyperparameter tuning을 진행하며 학습된 모델에 대한 predict API와 모델학습 파이프라인을 실행시킬 수 있는 train API를 제공합니다.
+* 2021.08.28 ~ 2021.10.06 기간동안 진행되었으며 현재 개발종료되었습니다.
+
+<br/>
 
 **Phase 2**  
-Phase 2에서는 좀 더 나아가 CD/CT를 도입하였으며 
+* Git Action과 Kubernetes를 이용하여 CD/CT를 도입하였습니다.
+* hyperparameter tuning process를 NNI에서 ray를 이용해 관리하는 것으로 변경하였습니다. 이로인하여 필요하지 않게된 코드들이 생겨났고 모두 deprecated로 이동하였습니다.
+* Workflow관리도구로 prefect를 도입하였습니다. API를 처음 호출하였을 때 모델을 로딩하는 시간이 길어져 한번 호출된 모델은 일정시간 캐싱해두도록 변경하였습니다.
+* 클러스터 모니터링을 위해 prometheus와 grafana를 도입하였습니다.
+* 2021.10.06 ~ 2021.11.13 기간동안 진행되었으며 현재 개발종료되었습니다.
+
+<br/>
 
 **Phase 3**  
 * 진행예정
-* Key words - kubeflow, BentoML  
+* Keywords - kubeflow, BentoML, unittest
 
+<br/>
 <br/>
 
 # 프로젝트 실행해보기
@@ -39,6 +52,13 @@ Phase 2에서는 좀 더 나아가 CD/CT를 도입하였으며
 [Phase1 프로젝트 실행해보기](./docs/phase1.md)  
 [Phase2 프로젝트 실행해보기](./docs/phase2.md)
 
+<br/>
+<br/>
+
+# Phase3
+**진행예정**
+
+<br/>
 <br/>
 
 # Phase2(2021.10.06 ~ 2021.11.13)
@@ -55,6 +75,7 @@ Phase 2에서는 좀 더 나아가 CD/CT를 도입하였으며
   - 이를 위해 redis를 고려하였으나 최종적으로는 사용하지 않습니다. [변경이유](./docs/shoveling_note.md#Redis)
 
 <br/>
+<br/>
 
 # Phase1(2021.08.28 ~ 2021.10.06)
 ![](./docs/img/phase1.png)
@@ -65,7 +86,7 @@ Phase 2에서는 좀 더 나아가 CD/CT를 도입하였으며
   - 본 프로젝트에서는 어느정도의 자동화된 모습을 구현하기 위해 train을 api형태로 요청할 수 있게 구성하였습니다.
   - train 요청에따라 subprocess로 NNi를 이용한 hyper parameter tuning을 진행합니다.
   - 각 실험결과 best모델을 현재 저장된 모델 성능과 비교하여 db에 직렬화시켜 저장합니다.
-- predict는 `api-router-predict.py` 에 구성되어 있습니다.
+- predict는 `app/api/router/predict.py` 에 구성되어 있습니다.
   - prediction요청에 따라 결과를 반환합니다.
   - temp예측의 경우 서버 시작시 모델을 로드하여 모델을 매번 읽어오지 않도록 합니다.
   - insurance예측의 경우 db에서 매번 모델을 읽어와 예측을 진행합니다.
