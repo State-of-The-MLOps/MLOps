@@ -48,29 +48,26 @@ VALID_MNIST=/절대/경로/mnist_valid.csv
    <details>
        <summary>google cloud storage를 쓰지 않을 경우</summary>
        
-       ```python
+  
+  
+        import gdown
 
-          import gdown
+        google_path = 'https://drive.google.com/uc?id='
+        file_id = '115LZXgZA6gPQvf5FPI1b0nsnhNz5mzH0'
+        output_name = 'data_mnist_train.csv'
+        gdown.download(google_path+file_id,output_name,quiet=False)
+        google_path = 'https://drive.google.com/uc?id='
+        file_id = '1ExfRt-4YfbP8gOAXfudlR6Lt7PbPhJzs'
+        output_name = 'data_mnist_valid.csv'
+        gdown.download(google_path+file_id,output_name,quiet=False)
 
-          google_path = 'https://drive.google.com/uc?id='
-          file_id = '115LZXgZA6gPQvf5FPI1b0nsnhNz5mzH0'
-          output_name = 'data_mnist_train.csv'
-          gdown.download(google_path+file_id,output_name,quiet=False)
-          google_path = 'https://drive.google.com/uc?id='
-          file_id = '1ExfRt-4YfbP8gOAXfudlR6Lt7PbPhJzs'
-          output_name = 'data_mnist_valid.csv'
-          gdown.download(google_path+file_id,output_name,quiet=False)
 
-       ```
-
-       - 
    </details>
 
 
     <details>
     <summary>google cloud storage를 사용할 경우</summary>
     
-    ```sql
 
         def insert_info():
             insert_q = """
@@ -102,7 +99,6 @@ VALID_MNIST=/절대/경로/mnist_valid.csv
 
         insert_info()
 
-    ```
     - google cloud storage에 choonsik-storage 이름으로 bucket생성 (다른이름일 경우 configmap.yaml 수정필요)
       - data폴더 아래에 데이터 저장 (`configmap` : CLOUD_TRAIN_MNIST: data/mnist_train.csv)
     - db에 cloud storage에 있는 data에 대한 정보 기록
