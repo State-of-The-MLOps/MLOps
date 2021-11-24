@@ -38,4 +38,62 @@ VALID_MNIST=/절대/경로/mnist_valid.csv
    2. `prefect agent local start`
    - prefect 실행시 mnist의 is_cloud 파라미터를 False로 변경해줍니다.
 
-## Review
+# k8s
+
+## data & env
+
+### data
+
+- google cloud storage에 choonsik-storage 이름으로 bucket생성 (다른이름일 경우 configmap.yaml 수정필요)
+  - data폴더 아래에 데이터 저장 (`configmap` : CLOUD_TRAIN_MNIST: data/mnist_train.csv)
+- db에 cloud storage에 있는 data에 대한 정보 기록
+    <details>
+    <summary>sql query</summary>
+    
+    ```sql
+
+        def insert_info():
+            insert_q = """
+                INSERT INTO data_info (
+                    path,
+                    exp_name,
+                    version,
+                    data_from
+                ) VALUES (
+                    '{}',
+                    '{}',
+                    {},
+                    '{}'
+                )
+            """
+
+            engine.execute(insert_q.format(
+                'data/mnist_train.csv',
+                'mnist',
+                1,
+                'mnist_company'
+            ))
+            engine.execute(insert_q.format(
+                'data/mnist_valid.csv',
+                'mnist',
+                1,
+                'mnist_company'
+            ))
+
+        insert_info()
+
+    ```
+    </details>
+
+### kubernetes secret
+
+- atmos-api-key : 온도정보를 받아오는 api key
+- prefect-config : [링크](https://cloud.prefect.io/user/keys) 에서 key 발급후 ~/.prefect/config.toml 에 기록 ([참고](https://docs.prefect.io/orchestration/concepts/api_keys.html#using-api-keys))
+- psql-passwd : postgresql password
+- [링크](https://cloud.google.com/docs/authentication/getting-started)를 참고하여 service-account-file을 발급받고 k8s secret으로 관리
+
+## Project
+
+0. data&env 단계를 수행합니다.
+1. `cd k8s && kubectl apply -k kustomization.yaml`
+# Review
