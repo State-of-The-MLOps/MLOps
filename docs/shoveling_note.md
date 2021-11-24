@@ -1,8 +1,8 @@
 # 삽질록
 
-## NNi vs Ray 주관비교
+## NNI vs Ray 주관비교
 
-### NNi
+### NNI
 
 <img src='./img/nni.png'>
 
@@ -14,12 +14,11 @@
   - python code로만 관리되었으면 하는데 불필요한 파일작성이 필요했습니다.
   - webui를 실험 실행때 자동으로 띄우는데 이를 배제하는 옵션이 존재하지 않았습니다.
 
+<br/>
+<br/>
 
 ## 우리는 왜 Redis를 버렸는가
-
-
 ![](./img/api-test.png)
-
 
 - 상당히 작은 모델임에도 불구하고 redis에 넣기전 serialize하는 작업과
 - redis에서 꺼내서 deserialize하는 작업이 오래 걸립니다.
