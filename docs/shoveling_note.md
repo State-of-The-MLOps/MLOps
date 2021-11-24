@@ -14,32 +14,12 @@
   - python code로만 관리되었으면 하는데 불필요한 파일작성이 필요했습니다.
   - webui를 실험 실행때 자동으로 띄우는데 이를 배제하는 옵션이 존재하지 않았습니다.
 
+
 ## 우리는 왜 Redis를 버렸는가
 
-### Redis
 
-```
-for _ in range(5):
-    model = client.get("redis_model")
+![](./img/api-test.png)
 
-    if model:
-        get_start = time.time()
-        stream = io.BytesIO(model)
-        model = torch.load(stream)
-        get_end = time.time()
-        client.expire("redis_model", 100)
-        print('get_end - get_start', get_end-get_start)
-    else:
-        model = mlflow.pytorch.load_model("runs:/9c00e1c297bd46b296db012487766205/model")
-        set_start = time.time()
-        client.set(
-            "redis_model", model.save_to_buffer(), datetime.timedelta(seconds=5)
-        )
-        set_end = time.time()
-        print('set_end - set_start', set_end-set_start)
-```
-
-<img src='./img/redis_pytorch_time.png'>
 
 - 상당히 작은 모델임에도 불구하고 redis에 넣기전 serialize하는 작업과
 - redis에서 꺼내서 deserialize하는 작업이 오래 걸립니다.
