@@ -27,12 +27,12 @@ VALID_MNIST=/절대/경로/mnist_valid.csv
 2. `conda create --name mlops-phase1 python=3.8`
 3. `conda activate mlops-phase1`
 4. `bash requirements.sh`로 필요한 라이브러리를 설치합니다.
-   * requirements.txt로 설치해본 결과 tfdv문제때문에 설치가 원할하지 않습니다.
-   * 설치가 원할하지 않다면 sh파일의 명령어를 복사해서 커맨드 창에서 설치해줍니다. (ex 윈도우환경)
+   * requirements.txt로 설치해본 결과 tfdv문제때문에 설치가 원활하지 않습니다.
+   * 설치가 원활하지 않다면 sh파일의 명령어를 복사해서 커맨드 창에서 설치해줍니다. (ex 윈도우환경)
 5. fast api server를 실행시킵니다.
    * `python main.py`
 6. mlflow server를 실행시킵니다
-   * `mlflow server --backend-store-uri postgresql://postgres:0000@localhost:5432/postgres --default-artifact-root <저장 경로>`
+   * `mlflow server --backend-store-uri postgresql://<user name>:<pass word>@localhost:5432/postgres --default-artifact-root <저장 경로>`
 7. prefect를 실행해 줍니다.
    1. `python prefect/mnist/main.py` : mnist pipeline 추가
    2. `prefect agent local start`
@@ -44,45 +44,61 @@ VALID_MNIST=/절대/경로/mnist_valid.csv
 
 ### data
 
-- google cloud storage에 choonsik-storage 이름으로 bucket생성 (다른이름일 경우 configmap.yaml 수정필요)
-  - data폴더 아래에 데이터 저장 (`configmap` : CLOUD_TRAIN_MNIST: data/mnist_train.csv)
-- db에 cloud storage에 있는 data에 대한 정보 기록
+- data 준비
+   <details>
+       <summary>google cloud storage를 쓰지 않을 경우</summary>
+       
+
+        import gdown
+
+        google_path = 'https://drive.google.com/uc?id='
+        file_id = '115LZXgZA6gPQvf5FPI1b0nsnhNz5mzH0'
+        output_name = 'data_mnist_train.csv'
+        gdown.download(google_path+file_id,output_name,quiet=False)
+        google_path = 'https://drive.google.com/uc?id='
+        file_id = '1ExfRt-4YfbP8gOAXfudlR6Lt7PbPhJzs'
+        output_name = 'data_mnist_valid.csv'
+        gdown.download(google_path+file_id,output_name,quiet=False)
+
+   </details>
+
+
     <details>
-    <summary>sql query</summary>
+    <summary>google cloud storage를 사용할 경우</summary>
     
-    ```sql
+      def insert_info():
+          insert_q = """
+              INSERT INTO data_info (
+                  path,
+                  exp_name,
+                  version,
+                  data_from
+              ) VALUES (
+                  '{}',
+                  '{}',
+                  {},
+                  '{}'
+              )
+          """
 
-        def insert_info():
-            insert_q = """
-                INSERT INTO data_info (
-                    path,
-                    exp_name,
-                    version,
-                    data_from
-                ) VALUES (
-                    '{}',
-                    '{}',
-                    {},
-                    '{}'
-                )
-            """
+          engine.execute(insert_q.format(
+              'data/mnist_train.csv',
+              'mnist',
+              1,
+              'mnist_company'
+          ))
+          engine.execute(insert_q.format(
+              'data/mnist_valid.csv',
+              'mnist',
+              1,
+              'mnist_company'
+          ))
 
-            engine.execute(insert_q.format(
-                'data/mnist_train.csv',
-                'mnist',
-                1,
-                'mnist_company'
-            ))
-            engine.execute(insert_q.format(
-                'data/mnist_valid.csv',
-                'mnist',
-                1,
-                'mnist_company'
-            ))
+      insert_info()
 
-        insert_info()
-
-    ```
+    - google cloud storage에 choonsik-storage 이름으로 bucket생성 (다른이름일 경우 configmap.yaml 수정필요)
+      - data폴더 아래에 데이터 저장 (`configmap` : CLOUD_TRAIN_MNIST: data/mnist_train.csv)
+    - db에 cloud storage에 있는 data에 대한 정보 기록
     </details>
 
 ### kubernetes secret
