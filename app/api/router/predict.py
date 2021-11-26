@@ -17,7 +17,7 @@ from app import schema
 from app.api.data_class import MnistData, ModelCorePrediction
 from app.database import engine
 from app.query import SELECT_BEST_MODEL
-from app.utils import CachingModel, VarTimer, load_data_cloud, softmax
+from app.utils import CachingModel, VarTimer, load_data, softmax
 from logger import L
 
 load_dotenv()
@@ -51,14 +51,15 @@ async def predict_mnist(item: MnistData):
     item2 = np.array(ast.literal_eval(item.mnist_num)).astype(np.uint8)
     model_name = "mnist"
     model_name2 = "mnist_knn"
-    version = 3
+    is_cloud = False
+    data_version = 1
+    exp_name = 'mnist'
 
     if not isinstance(train_df._var, pd.DataFrame):
         async with data_lock:
             if not isinstance(train_df._var, pd.DataFrame):
-                train_df.cache_var(
-                    load_data_cloud(CLOUD_STORAGE_NAME, version)
-                )
+                df, _ = load_data(is_cloud, data_version, exp_name)
+                train_df.cache_var(df)
 
     transform = transforms.Compose(
         [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]

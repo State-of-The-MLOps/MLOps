@@ -48,8 +48,6 @@ VALID_MNIST=/절대/경로/mnist_valid.csv
    <details>
        <summary>google cloud storage를 쓰지 않을 경우</summary>
        
-  
-  
         import gdown
 
         google_path = 'https://drive.google.com/uc?id='
@@ -61,43 +59,41 @@ VALID_MNIST=/절대/경로/mnist_valid.csv
         output_name = 'data_mnist_valid.csv'
         gdown.download(google_path+file_id,output_name,quiet=False)
 
-
    </details>
 
 
     <details>
     <summary>google cloud storage를 사용할 경우</summary>
     
+      def insert_info():
+          insert_q = """
+              INSERT INTO data_info (
+                  path,
+                  exp_name,
+                  version,
+                  data_from
+              ) VALUES (
+                  '{}',
+                  '{}',
+                  {},
+                  '{}'
+              )
+          """
 
-        def insert_info():
-            insert_q = """
-                INSERT INTO data_info (
-                    path,
-                    exp_name,
-                    version,
-                    data_from
-                ) VALUES (
-                    '{}',
-                    '{}',
-                    {},
-                    '{}'
-                )
-            """
+          engine.execute(insert_q.format(
+              'data/mnist_train.csv',
+              'mnist',
+              1,
+              'mnist_company'
+          ))
+          engine.execute(insert_q.format(
+              'data/mnist_valid.csv',
+              'mnist',
+              1,
+              'mnist_company'
+          ))
 
-            engine.execute(insert_q.format(
-                'data/mnist_train.csv',
-                'mnist',
-                1,
-                'mnist_company'
-            ))
-            engine.execute(insert_q.format(
-                'data/mnist_valid.csv',
-                'mnist',
-                1,
-                'mnist_company'
-            ))
-
-        insert_info()
+      insert_info()
 
     - google cloud storage에 choonsik-storage 이름으로 bucket생성 (다른이름일 경우 configmap.yaml 수정필요)
       - data폴더 아래에 데이터 저장 (`configmap` : CLOUD_TRAIN_MNIST: data/mnist_train.csv)
