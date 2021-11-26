@@ -48,7 +48,6 @@ VALID_MNIST=/절대/경로/mnist_valid.csv
    <details>
        <summary>google cloud storage를 쓰지 않을 경우</summary>
        
-
         import gdown
 
         google_path = 'https://drive.google.com/uc?id='
