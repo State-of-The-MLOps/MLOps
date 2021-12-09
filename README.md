@@ -22,7 +22,7 @@
     - [3.1.3. Inference API](#313-inference-api)
   - [3.2. Phase2 트러블슈팅](#32-phase2-트러블슈팅)
 - [4. Phase1(2021.08.28 ~ 2021.10.06)](#4-phase120210828--20211006)
-  - [4.1. Phase 1 주요기능](#41-phase-1-주요기능)
+  - [4.1. Phase1 주요기능](#41-phase1-주요기능)
   - [4.2. Phase1 트러블슈팅](#42-phase1-트러블슈팅)
 
 
@@ -92,14 +92,14 @@ ex) 10 6 * * 1 → 매주 월요일 6시 10분에 workflow 실행
 **cluster monitoring**
 - GCP에서 서비스를 제공할 당시 클러스터의 가용자원 모니터링을 위하여 Prometheus와 Grafana를 도입하였습니다.
 - 그라파나에서 제공중인 13077, 315 대시보드를 이용하였습니다.
-- 추가적으로 프로젝트를 진행하여 API의 사용자가 생긴다면 API별 사용량, 추론 결과
+<!-- - 추가적으로 프로젝트를 진행하여 API의 사용자가 생긴다면 API별 사용량, 추론 결과를 모니터링할 수 있겠습니다. -->
 
 <br>
 
 ### 3.1.3. Inference API
 - ML파이프라인에 의해 생성된 모델을 이용한 inference 결과를 제공합니다.
 - API server는 inference 요청이 들어오면 해당 모델이 캐싱되어있는지 확인한 후 없으면 MLflow server와 통신하여 모델을 로드한 후 요청사항을 처리하여 결과를 반환합니다.
-- Fast API를 이용하였습니다.
+- [Fast API](https://github.com/tiangolo/fastapi)를 이용하였습니다.
   
 <br>
 
@@ -124,7 +124,7 @@ ex) 10 6 * * 1 → 매주 월요일 6시 10분에 workflow 실행
 # 4. Phase1(2021.08.28 ~ 2021.10.06)
 ![](./docs/img/phase1.png)
 
-## 4.1. Phase 1 주요기능
+## 4.1. Phase1 주요기능
 - Phase1에서는  [MLOps level 0](https://cloud.google.com/architecture/)를 구현하기 위하여 노력하였습니다.
 - train은 experiments 폴더에 구성되어 있습니다.
   - 본 프로젝트에서는 어느정도의 자동화된 모습을 구현하기 위해 train을 api형태로 요청할 수 있게 구성하였습니다.
