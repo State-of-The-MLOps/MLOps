@@ -27,6 +27,8 @@ spec:
         - name: task-pv-storage
           persistentVolumeClaim:
             claimName: task-pv-claim
+      nodeSelector:
+        kubernetes.io/hostname: cd-test-2
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -131,6 +133,8 @@ spec:
         - name: prefect-cfg
           secret:
             secretName: prefect-config
+      nodeSelector:
+        kubernetes.io/hostname: cd-test-3
 ---
 apiVersion: apps/v1
 kind: Deployment
