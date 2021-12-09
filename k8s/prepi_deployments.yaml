@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fastapi-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-server
+  template:
+    metadata:
+      name: fastapi
+      labels:
+        app: api-server
+    spec:
+      containers:
+      - name: fastapi-backend
+        image: hl8469/mlops-project:api-server-1.0
+        imagePullPolicy: "Always"
+        envFrom:
+        - secretRef:
+            name: psql-passwd
+        - configMapRef:
+            name: config-map
+        volumeMounts:
+        - name: gcs
+          mountPath: /secret/service-account-file.json
+          subPath: service-account-file.json
+          readOnly: true 
+        ports:
+        - containerPort: 8000
+          protocol: TCP
+
+      volumes:
+        - name: gcs
+          secret:
+            secretName: service-account-file
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prefect-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prefect-service
+  template:
+    metadata:
+      name: prefect
+      labels:
+        app: prefect-service
+    spec:
+      containers:
+      - name: prefect-worker
+        image: hl8469/mlops-project:prefect-worker-1.0
+        imagePullPolicy: "Always"
+        envFrom:
+        - secretRef:
+            name: psql-passwd
+        - secretRef:
+            name: atmos-api-key
+        - configMapRef:
+            name: config-map
+        volumeMounts:
+        - name: gcs
+          mountPath: /secret/service-account-file.json
+          subPath: service-account-file.json
+          readOnly: true
+        - name: prefect-cfg
+          mountPath: /root/.prefect/config.toml
+          subPath: config.toml
+
+      volumes:
+        - name: gcs
+          secret:
+            secretName: service-account-file
+        - name: prefect-cfg
+          secret:
+            secretName: prefect-config
+      nodeSelector:
+        kubernetes.io/hostname: cd-test-3

@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-map
+data:
+  POSTGRES_USER: postgres
+  POSTGRES_SERVER: pgdb
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: postgres
+  MLFLOW_HOST: http://mlflow-service:5000
+  GOOGLE_APPLICATION_CREDENTIALS: /secret/service-account-file.json
+  CLOUD_STORAGE_NAME: choonsik-storage
+  CLOUD_TRAIN_MNIST: data/mnist_train.csv
+  CLOUD_VALID_MNIST: data/mnist_valid.csv

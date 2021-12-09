@@ -1,0 +1,156 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgresql-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-server
+  template:
+    metadata:
+      name: postgresql
+      labels:
+        app: postgres-server
+    spec:
+      containers:
+      - name: postgresql
+        image: hl8469/mlops-project:postgre
+        imagePullPolicy: "Always"
+        volumeMounts:
+        - mountPath: /var/lib/postgresql/data
+          name: task-pv-storage
+        ports:
+        - containerPort: 5432
+          protocol: TCP
+      volumes:
+        - name: task-pv-storage
+          persistentVolumeClaim:
+            claimName: task-pv-claim
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mlflow-server
+  template:
+    metadata:
+      name: mlflow
+      labels:
+        app: mlflow-server
+    spec:
+      containers:
+      - name: mlflow
+        image: hl8469/mlops-project:mlflow-server-1.0
+        imagePullPolicy: "Always"
+        ports:
+        - containerPort: 5000
+          protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fastapi-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-server
+  template:
+    metadata:
+      name: fastapi
+      labels:
+        app: api-server
+    spec:
+      containers:
+      - name: fastapi-backend
+        image: hl8469/mlops-project:api-server-1.0
+        imagePullPolicy: "Always"
+        envFrom:
+        - secretRef:
+            name: psql-passwd
+        - configMapRef:
+            name: config-map
+        volumeMounts:
+        - name: gcs
+          mountPath: /secret/service-account-file.json
+          subPath: service-account-file.json
+          readOnly: true 
+        ports:
+        - containerPort: 8000
+          protocol: TCP
+
+      volumes:
+        - name: gcs
+          secret:
+            secretName: service-account-file
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prefect-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prefect-service
+  template:
+    metadata:
+      name: prefect
+      labels:
+        app: prefect-service
+    spec:
+      containers:
+      - name: prefect-worker
+        image: hl8469/mlops-project:prefect-worker-1.0
+        imagePullPolicy: "Always"
+        envFrom:
+        - secretRef:
+            name: psql-passwd
+        - secretRef:
+            name: atmos-api-key
+        - configMapRef:
+            name: config-map
+        volumeMounts:
+        - name: gcs
+          mountPath: /secret/service-account-file.json
+          subPath: service-account-file.json
+          readOnly: true
+        - name: prefect-cfg
+          mountPath: /root/.prefect/config.toml
+          subPath: config.toml
+
+      volumes:
+        - name: gcs
+          secret:
+            secretName: service-account-file
+        - name: prefect-cfg
+          secret:
+            secretName: prefect-config
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: front
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: front-app
+  template:
+    metadata:
+      name: front
+      labels:
+        app: front-app
+    spec:
+      containers:
+      - name: front-worker
+        image: ehddnr/mnist_front:1.0.0
+        imagePullPolicy: "Always"
+        ports:
+        - containerPort: 3000
+          protocol: TCP

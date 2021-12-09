@@ -1,10 +1,8 @@
 import codecs
 import glob
 import io
-import multiprocessing
 import os
 import pickle
-import re
 import shutil
 import socketserver
 import subprocess
@@ -13,10 +11,13 @@ import zipfile
 
 import tensorflow as tf
 import yaml
+from dotenv import load_dotenv
 
 from app.database import engine
 from app.query import *
 from logger import L
+
+load_dotenv()
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
@@ -117,10 +118,6 @@ class TensorFlowModel(CoreModel):
         with zipfile.ZipFile(model_buffer, "r") as bf:
             bf.extractall(model_path)
         self.model = tf.keras.models.load_model(model_path)
-
-
-my_model = TensorFlowModel("test_model")
-my_model.load_model()
 
 
 def write_yml(path, experiment_name, experimenter, model_name, version):
