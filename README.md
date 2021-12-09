@@ -1,6 +1,6 @@
 <h1>MLOps project</h1>
 <h2>🚀 프로젝트 목표 🚀</h2>
-<h3>지속가능한 AI 서비스를 위한 MLOps 구성</h3>
+<h3>지속가능한 AI 서비스를 위한 MLOps System 구성</h3>
 
 [![](https://img.shields.io/static/v1?label=Python&message=3.8&color=0277bd&labelColor=gray&style=flat&logo=data:image/png;base64,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)](https://www.python.org/)
 [![](https://img.shields.io/static/v1?label=FastAPI&message=0.7&color=009485&labelColor=gray&style=flat&logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAxCAYAAACYq/ofAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAAFxEAABX9ATtpm7EAAAVESURBVGhD7ZltaBxFGMefZ++Spk1bTbBNW1FRkFiVWCGQWkQoxJeKCCUQVFRQG2OatPGlkqSHvRyaNrFGTOvFhpoPtaKYUkSpouIHIykiVCsUFdQWraA2BtuaNsmZux3/c/ekJt7t7ezegR+8H8zt/J8dduc/bzu7RwUKFChQ4L+A5ZgfBrovorhdQ2zVEKmVpOhyRMuQAkiTSL/hlsdxPErMI3TJlT9QfX0COmdyNxIOB2nZ/LVkqw2k1K2o4CIclZx1hlmX+Q6G3yA7sI82tf2SOuEP/0aUYnql5zYYeJZYrULr+4f5PC44SJOxbtoSGZOoJ/wZ6etaQkGrD7m6pCETmGz82jAcTAUywaMo8ji1hA5CeGoaPXa9sfu5agoEPoCBm6DMG8KyPkRpC9Url0gmStE76+mu2jKqvvkTGh42nj+WHM2I9qxNVkgpPYnNYZ6mRLxTVHYU6mSrTbS0ZD/19c2TqCvmRvq7VxMlDuJGiyTiATWE4XJUhBlKrafgxGByMTHAzMjunhWk7LdgYqFEzNET2eKIKG8oVU8V8zpEZcXdyNBQgAJqD0wsl4hHeC81dfwowjuK2ynavUaUI+5GRk/UkW3fIcorpyme2Cl5fyhVhEViFw0MFEkkI9mN6MnG9jZR3mGrl1pDv4vyj21XUeLMPaIykt1I8cSdqE2lKG8wn6Rg2cuickfZm5PD3IHsRhQ/hK7198xWtJ0aGydE5YMqGju+SvJpOBvpDZejS28R5Q2Lv6ai8v2i8kNyB8F3i0rD2ciCkioMj1JR5ujNoKJt6I1picyCz+H82QwpJgWyo8ixYZ2N2HSDv2GlRmh06j0R/6ANnppcjXMVc9KSqUuxKh2TUi6oq52e9s57pej2F9ECLaLMYE6QZddSU+iwRNzp34HlXb0pKjt6q1NsX0UNoVMSuYBzjzBfLDlzmA55MqFbV/EzotxhLqZYcYmoOTgbUexti6/HuWJvz5ziiXtxo2tFmRGIZ6yXsxFSf0rGDObXqbn9W1HuvLazFEM3hHkoAQOUihMnMi4MzkYs/lly7jCP43WpS5QZ4/GHMTeuEGUG0xni6bOi5uA8fPq716EF3jVcuc4hfZ9+NQQCajM9tvVzCaTQHykS6hiMLJOIGcxfUHOHfqFLw7lHihJfoh5TotzQ2/sbMVQyJGtxqsgs4naLZxMaphHJpeFspCE0isl7RFT+eKmrAjVqFeUNZR2SXBpZJjvaE1Mylc0jQetJDFcfSzufoNGJz0Slkc0IrEweQHf+Kip3oi9chus9KsobzHsoEvlLVBrZjbRE9N7oeVG5w9Nb0Rt+9m8naWFgr6iMZDeimV7wanK1yJVdXdfg9/6U8EDye5i1hR58+rxEMuJupLU1hv3TIzAzLhF/BAMhrFTGn3dmsY+a296RvCPuRjRNoW9QcgNaJy4Rb/TvwDJs14kyh63DFIw9gZzrs8zMiKap421cuAk9k+E9Iwu2zahGJ5LR96kLMJb+qck6aowYvWWaG9FsbN+HCt2Hm5jvwyxegwa9XZQZbL1PQV5HT0X+kIgr3na4M0S7V6Jyg1iBqiXijDatVPrTPTNTqFEXjcZ6sdR6Gsb+jGjC4WKqKGlAD7Wjonha54BemRR9hH1Ze3I++sC/kRn6woupqOQBXEp/cbkeyXy4poYoth0qShs7jkD7eLVOkbuRGcJhi5bOr0SlanHVGkQq0crLoTGs2ILBGCo6hnM/YQ/3FfKf0jgNU1tbbsu6kD8j/0Z/vuns1B/ULLoOv6dXKCr72Kb6A3n5z7BAgQL/S4j+BrgJoam4QNPgAAAAAElFTkSuQmCC)](https://fastapi.tiangolo.com/)
@@ -15,30 +15,21 @@
 
 - [1. 프로젝트 소개](#1-프로젝트-소개)
 - [2. 프로젝트 실행해보기](#2-프로젝트-실행해보기)
-- [3. Phase3](#3-phase3)
-- [4. Phase2(2021.10.06 ~ 2021.11.13)](#4-phase220211006--20211113)
-  - [4.1. Phase2 주요기능](#41-phase2-주요기능)
-    - [4.1.1. 전체 흐름도](#411-전체-흐름도)
-    - [4.1.2. 실험관리 및 모델학습](#412-실험관리-및-모델학습)
-    - [4.1.3. API server](#413-api-server)
-  - [4.2. Phase2 트러블슈팅](#42-phase2-트러블슈팅)
-- [5. Phase1(2021.08.28 ~ 2021.10.06)](#5-phase120210828--20211006)
-  - [Phase 1 주요기능](#phase-1-주요기능)
-  - [Phase1 트러블슈팅](#phase1-트러블슈팅)
+- [3. Phase2(2021.10.06 ~ 2021.11.13)](#3-phase220211006--20211113)
+  - [3.1. Phase2 주요기능](#31-phase2-주요기능)
+    - [3.1.1. 전체 흐름도](#311-전체-흐름도)
+    - [3.1.2. 실험관리 및 모델학습](#312-실험관리-및-모델학습)
+    - [3.1.3. Inference API](#313-inference-api)
+  - [3.2. Phase2 트러블슈팅](#32-phase2-트러블슈팅)
+- [4. Phase1(2021.08.28 ~ 2021.10.06)](#4-phase120210828--20211006)
+  - [4.1. Phase 1 주요기능](#41-phase-1-주요기능)
+  - [4.2. Phase1 트러블슈팅](#42-phase1-트러블슈팅)
 
 
 <br/>
-<br/>
-
 
 # 1. 프로젝트 소개
 > 저희 프로젝트는 여러 Phase로 이루어져 있습니다. 현재 단락에서 각 Phase에 대하여 간략히 설명하였고, 각 단계에서 구현한 구체적인 내용에 대한 자세한 설명은 아래에 따로 기술하였습니다.
-
-<br/>
-
-**Phase 3**  
-* 진행예정
-* Keywords - kubeflow, BentoML, unittest
 
 <br/>
 
@@ -69,47 +60,54 @@
 <br/>
 <br/>
 
-# 3. Phase3
-**진행예정 입니다.**
+# 3. Phase2(2021.10.06 ~ 2021.11.13)
 
-<br/>
-<br/>
-
-# 4. Phase2(2021.10.06 ~ 2021.11.13)
-![](./docs/img/phase2.png)
-
-## 4.1. Phase2 주요기능
+## 3.1. Phase2 주요기능
 
 Phase2 단계에서는 [MLOps level 1](https://cloud.google.com/architecture/mlops-continuous-delivery-and-automation-pipelines-in-machine-learning#mlops_level_1_ml_pipeline_automation)을 구현하기 위하여 노력하였습니다.
 
 <br>
 
-### 4.1.1. 전체 흐름도
-그림넣고 설명하기
-
-### 4.1.2. 실험관리 및 모델학습
-**Model artifact 저장**
-- MLflow를 이용, Google Cloud Storage에 저장
-
-**성능평가지표, 점수, 사용된 하이퍼파라미터**
-- MLflow를 이용, PostgreSQL에 저장
-
-**AutoML**
-- Phase1에서는 NNI를 사용하였지만 다음과 같은 이유로 Ray Tune으로 변경하였습니다. [변경이유](./docs/shoveling_note.md#NNI)
-
-**workflow관리**
-- 처음엔 크론탭을 고려하였지만 최종적으로 [Prefect](https://github.com/PrefectHQ/prefect)를 사용하였습니다.
-- web UI를 제공하여 수동으로 workflow를 실행할 수 있으며 실행 결과를 쉽게 확인할 수 있습니다.
-- 주기적인 실행이 필요한 workflow들을 리눅스의 크론탭과 유사한 문법으로 정의할 수 있습니다. ex) 10 6 * * 1 → 매주 월요일 6시 10분에 workflow 실행
-
-### 4.1.3. API server
-
+### 3.1.1. 전체 흐름도
+![](./docs/img/phase2.png)
 
 <br>
 
-## 4.2. Phase2 트러블슈팅
+### 3.1.2. 실험관리 및 모델학습
+**Model artifacts**
+- MLflow를 이용하여 Google Cloud Storage에 저장합니다.
 
-<!-- ------------수정 후 삭제하기---------------
+**성능평가지표, 점수, 각 실험에서 사용된 하이퍼파라미터**
+- MLflow를 이용하여 PostgreSQL에 저장합니다.
+
+**AutoML**
+- Ray tune을 이용하여 하이퍼파라미터 서칭을 합니다.
+
+**workflow management**
+- 처음엔 크론탭을 고려하였지만 최종적으로 [Prefect](https://github.com/PrefectHQ/prefect)를 사용하였습니다.
+- web UI를 제공하여 수동으로 workflow를 실행할 수 있으며 실행 결과를 쉽게 확인할 수 있습니다.
+- 주기적인 실행이 필요한 workflow들을 리눅스의 크론탭과 동일한 문법으로 정의할 수 있습니다.  
+ex) 10 6 * * 1 → 매주 월요일 6시 10분에 workflow 실행
+
+**cluster monitoring**
+- GCP에서 서비스를 제공할 당시 클러스터의 가용자원 모니터링을 위하여 Prometheus와 Grafana를 도입하였습니다.
+- 그라파나에서 제공중인 13077, 315 대시보드를 이용하였습니다.
+- 추가적으로 프로젝트를 진행하여 API의 사용자가 생긴다면 API별 사용량, 추론 결과
+
+<br>
+
+### 3.1.3. Inference API
+- ML파이프라인에 의해 생성된 모델을 이용한 inference 결과를 제공합니다.
+- API server는 inference 요청이 들어오면 해당 모델이 캐싱되어있는지 확인한 후 없으면 MLflow server와 통신하여 모델을 로드한 후 요청사항을 처리하여 결과를 반환합니다.
+- Fast API를 이용하였습니다.
+  
+<br>
+
+## 3.2. Phase2 트러블슈팅
+- Phase1에서는 NNI를 사용하였지만 다음과 같은 이유로 Ray Tune으로 변경하였습니다. [해결한 방법](./docs/phase2_trouble.md#NNI)
+- GCP로 서버를 이전한 후 MLflow에서 모델을 로드하는 시간이 약 10초로 매우 늦어졌습니다. [해결한 방법](./docs/phase2_trouble.md#우리는왜Redis를버렸나)
+
+<!-- ------------수정 후 삭제하기--------------
 - train은 더이상 api요청을 통해 이루어지지 않고 prefect를 통해 관리됩니다.
   - atmos_tmp 데이터의 경우 매일 데이터 크롤링하기 위해 scheduling된 작업을 수행합니다.
   - prefect cloud를 통해 수동으로 실험을 실행시켜 더나은 모델을 위한 training을 수행할 수 있습니다.
@@ -123,10 +121,10 @@ Phase2 단계에서는 [MLOps level 1](https://cloud.google.com/architecture/mlo
 <br/>
 <br/>
 
-# 5. Phase1(2021.08.28 ~ 2021.10.06)
+# 4. Phase1(2021.08.28 ~ 2021.10.06)
 ![](./docs/img/phase1.png)
 
-## Phase 1 주요기능
+## 4.1. Phase 1 주요기능
 - Phase1에서는  [MLOps level 0](https://cloud.google.com/architecture/)를 구현하기 위하여 노력하였습니다.
 - train은 experiments 폴더에 구성되어 있습니다.
   - 본 프로젝트에서는 어느정도의 자동화된 모습을 구현하기 위해 train을 api형태로 요청할 수 있게 구성하였습니다.
@@ -139,4 +137,4 @@ Phase2 단계에서는 [MLOps level 1](https://cloud.google.com/architecture/mlo
 - logger
   - 요청, 실험진행 등을 log로 남깁니다.
 
-## Phase1 트러블슈팅
+## 4.2. Phase1 트러블슈팅
